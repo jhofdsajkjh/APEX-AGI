@@ -3,7 +3,9 @@
 //! 支持Rust和Python双语言生成、代码质量评分、语法验证
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::process::{Command, Stdio};
+use std::time::Duration;
 use thiserror::Error;
 
 // ============================================================================
@@ -173,6 +175,317 @@ impl GeneratedCode {
             quality.performance * 0.20;
         
         quality
+    }
+}
+
+// ============================================================================
+// Template Library
+// ============================================================================
+
+/// 代码模板模式分析结果
+#[derive(Clone, Debug, Default)]
+pub struct PromptAnalysis {
+    pub function_name: Option<String>,
+    pub parameters: Vec<(String, String)>, // (name, type)
+    pub return_type: Option<String>,
+    pub requirements: Vec<String>,
+    pub needs_error_handling: bool,
+    pub needs_async: bool,
+    pub needs_tests: bool,
+    pub needs_struct: bool,
+    pub needs_trait: bool,
+}
+
+/// 代码模板库 - 存储各类代码模式的模板
+#[derive(Clone, Debug)]
+pub struct TemplateLibrary {
+    /// 模板集合: 类别名 -> 模板代码片段列表
+    pub templates: HashMap<String, Vec<String>>,
+}
+
+impl Default for TemplateLibrary {
+    fn default() -> Self {
+        let mut templates: HashMap<String, Vec<String>> = HashMap::new();
+
+        // Rust 函数模式
+        templates.insert("rust_function".to_string(), vec![
+            r#"/// {doc_comment}
+///
+/// # Arguments
+///
+/// * `{params}` - {param_desc}
+///
+/// # Returns
+///
+/// {return_desc}
+///
+/// # Errors
+///
+/// Returns an error if {error_condition}.
+pub fn {fn_name}({params}) -> Result<{return_type}, Box<dyn std::error::Error>> {
+    // TODO: Implement {fn_name}
+    todo!("Implement {fn_name}")
+}"#.to_string(),
+            r#"/// {doc_comment}
+///
+/// # Arguments
+///
+/// * `{params}` - {param_desc}
+///
+/// # Returns
+///
+/// {return_desc}
+pub fn {fn_name}({params}) -> {return_type} {
+    // TODO: Implement {fn_name}
+    todo!("Implement {fn_name}")
+}"#.to_string(),
+        ]);
+
+        // Rust 结构体模式
+        templates.insert("rust_struct".to_string(), vec![
+            r#"/// {doc_comment}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct {struct_name} {
+{fields}
+}
+
+impl {struct_name} {
+    /// Creates a new `{struct_name}`.
+    pub fn new({params}) -> Self {
+        Self {
+{field_inits}
+        }
+    }
+}"#.to_string(),
+        ]);
+
+        // Rust async 函数模式
+        templates.insert("rust_async".to_string(), vec![
+            r#"/// {doc_comment}
+///
+/// # Arguments
+///
+/// * `{params}` - {param_desc}
+///
+/// # Returns
+///
+/// {return_desc}
+///
+/// # Errors
+///
+/// Returns an error if {error_condition}.
+pub async fn {fn_name}({params}) -> Result<{return_type}, Box<dyn std::error::Error>> {
+    // TODO: Implement {fn_name}
+    todo!("Implement {fn_name}")
+}"#.to_string(),
+        ]);
+
+        // Rust 错误处理模式
+        templates.insert("rust_error".to_string(), vec![
+            r#"#[derive(Debug, thiserror::Error)]
+pub enum {error_name} {
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+    #[error("Operation failed: {0}")]
+    OperationFailed(String),
+    #[error("Not found: {0}")]
+    NotFound(String),
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+}"#.to_string(),
+        ]);
+
+        // Rust trait 模式
+        templates.insert("rust_trait".to_string(), vec![
+            r#"/// {doc_comment}
+pub trait {trait_name} {
+    /// {method_doc}
+    fn {method_name}({params}) -> {return_type};
+}
+
+impl {trait_name} for {impl_type} {
+    fn {method_name}({params}) -> {return_type} {
+        // TODO: Implement {method_name} for {impl_type}
+        todo!("Implement {method_name} for {impl_type}")
+    }
+}"#.to_string(),
+        ]);
+
+        // Rust 测试模式
+        templates.insert("rust_test".to_string(), vec![
+            r#"#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_{fn_name}_basic() {
+        // TODO: Add basic test
+        let result = {fn_name}({test_args});
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_{fn_name}_edge_cases() {
+        // TODO: Add edge case tests
+    }
+
+    #[test]
+    fn test_{fn_name}_error_handling() {
+        // TODO: Add error handling tests
+    }
+}"#.to_string(),
+        ]);
+
+        // Python 函数模式
+        templates.insert("python_function".to_string(), vec![
+            r#"""\"{doc_comment}
+    
+    Args:
+        {params}: {param_desc}
+        
+    Returns:
+        {return_desc}
+        
+    Raises:
+        {error_type}: If {error_condition}
+    \"\""
+def {fn_name}({params}) -> {return_type}:
+    # TODO: Implement {fn_name}
+    raise NotImplementedError("{fn_name} not implemented")
+"#.to_string(),
+            r#"""\"{doc_comment}
+    
+    Args:
+        {params}: {param_desc}
+        
+    Returns:
+        {return_desc}
+    \"\""
+def {fn_name}({params}) -> {return_type}:
+    # TODO: Implement {fn_name}
+    raise NotImplementedError("{fn_name} not implemented")
+"#.to_string(),
+        ]);
+
+        // Python 类模式
+        templates.insert("python_class".to_string(), vec![
+            r#"class {class_name}:
+    """{doc_comment}"""
+    
+    def __init__(self{params}):
+        \"\"\"Initialize {class_name}.\"\"\"
+{field_inits}
+    
+    def {method_name}(self{method_params}) -> {return_type}:
+        \"\"\"{method_doc}\"\"\"
+        # TODO: Implement {method_name}
+        raise NotImplementedError("{method_name} not implemented")
+"#.to_string(),
+        ]);
+
+        // Python async 函数模式
+        templates.insert("python_async".to_string(), vec![
+            r#"import asyncio
+
+async def {fn_name}({params}) -> {return_type}:
+    """{doc_comment}
+    
+    Args:
+        {params}: {param_desc}
+        
+    Returns:
+        {return_desc}
+        
+    Raises:
+        {error_type}: If {error_condition}
+    """
+    # TODO: Implement {fn_name}
+    raise NotImplementedError("{fn_name} not implemented")
+"#.to_string(),
+        ]);
+
+        // Python 错误处理模式
+        templates.insert("python_error".to_string(), vec![
+            r#"class {error_name}(Exception):
+    """{doc_comment}"""
+    pass
+
+class InvalidInputError({error_name}):
+    """Raised when input is invalid."""
+    pass
+
+class OperationFailedError({error_name}):
+    """Raised when an operation fails."""
+    pass
+"#.to_string(),
+        ]);
+
+        // Python 测试模式
+        templates.insert("python_test".to_string(), vec![
+            r#"import pytest
+from {module} import {fn_name}
+
+def test_{fn_name}_basic():
+    # TODO: Add basic test
+    result = {fn_name}({test_args})
+    assert result is not None
+
+def test_{fn_name}_edge_cases():
+    # TODO: Add edge case tests
+    pass
+
+def test_{fn_name}_error_handling():
+    # TODO: Add error handling tests
+    with pytest.raises(Exception):
+        {fn_name}(None)
+"#.to_string(),
+        ]);
+
+        // Rust 文档注释模板
+        templates.insert("rust_doc_comment".to_string(), vec![
+            r#"/// {doc_comment}
+///
+/// # Examples
+///
+/// ```
+/// use {crate_name}::{fn_name};
+///
+/// let result = {fn_name}({example_args});
+/// assert!(result.is_ok());
+/// ```
+"#.to_string(),
+        ]);
+
+        Self { templates }
+    }
+}
+
+impl TemplateLibrary {
+    /// 创建新的模板库
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 获取指定类别的所有模板
+    pub fn get_templates(&self, category: &str) -> Vec<String> {
+        self.templates.get(category).cloned().unwrap_or_default()
+    }
+
+    /// 添加模板
+    pub fn add_template(&mut self, category: &str, template: String) {
+        self.templates
+            .entry(category.to_string())
+            .or_insert_with(Vec::new)
+            .push(template);
+    }
+
+    /// 替换模板中的占位符
+    pub fn fill_template(template: &str, values: &HashMap<&str, &str>) -> String {
+        let mut result = template.to_string();
+        for (key, value) in values {
+            result = result.replace(&format!("{{{}}}", key), value);
+        }
+        result
     }
 }
 

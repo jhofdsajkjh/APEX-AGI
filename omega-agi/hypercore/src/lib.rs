@@ -17,7 +17,7 @@ pub mod self_heal;
 pub use scheduler::{TaskScheduler, TaskPriority, TaskId};
 pub use memory::{MemoryPool, MemoryStats};
 pub use security::{Capability, CapabilitySet, SecurityRing};
-pub use session::SessionManager;
+pub use session::{SessionConfig, SessionManager};
 pub use errors::HyperCoreError;
 pub use health::{HealthMonitor, HealthSnapshot};
 pub use pipeline::{PipelineOrchestrator, PipelineResult, HealthCheck};
@@ -45,8 +45,8 @@ impl HyperCore {
         Ok(Self {
             scheduler: TaskScheduler::new(),
             memory: MemoryPool::new(1024 * 1024 * 10)?,
-            security: SecurityRing::new(),
-            session: SessionManager::new(),
+            security: SecurityRing::default(),
+            session: SessionManager::new(SessionConfig::default()),
             health: HealthMonitor::new(),
             diagnostics: DiagnosticEngine::new(),
             pipeline: PipelineOrchestrator::new("omega"),

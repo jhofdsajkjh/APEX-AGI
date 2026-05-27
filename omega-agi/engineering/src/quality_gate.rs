@@ -163,10 +163,11 @@ impl QualityGateRunner {
     }
 
     pub fn run_phase(&self, phase: u32, context: &GateContext) -> PhaseResult {
-        let gates = self.gates.get(&phase).cloned().unwrap_or_default();
+        let empty = Vec::new();
+        let gates = self.gates.get(&phase).unwrap_or(&empty);
         let mut results = Vec::new();
 
-        for gate in &gates {
+        for gate in gates {
             let result = gate.check(context);
             results.push(result);
         }

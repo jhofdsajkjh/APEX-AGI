@@ -85,6 +85,12 @@ pub struct MemoryPool {
 }
 
 impl MemoryPool {
+    /// Create a new memory pool in the system temp directory.
+    pub fn new(capacity: usize) -> Result<Self> {
+        let path = std::env::temp_dir().join(format!("omega_mem_{}.bin", std::process::id()));
+        Self::open(path, capacity)
+    }
+
     /// Create a new memory pool or open an existing one
     pub fn open<P: AsRef<Path>>(path: P, capacity: usize) -> Result<Self> {
         let path = path.as_ref().to_path_buf();

@@ -200,6 +200,7 @@ impl ConsensusEngine {
         
         // Phase 2: Commit
         let proposal_id = self.propose(proposal).await?;
+        let total = participants.len();
         
         for participant in participants {
             let vote = Vote {
@@ -209,7 +210,7 @@ impl ConsensusEngine {
                 timestamp: current_timestamp(),
                 comment: None,
             };
-            self.vote(vote, participants.len()).await?;
+            self.vote(vote, total).await?;
         }
         
         Ok(true)
