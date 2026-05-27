@@ -1,6 +1,7 @@
 //! # OMEGA AGI Supremacy
 //!
 //! Five-layer AGI system: HyperCore → Runtime → Engineering → Evolution → Pipeline.
+//! Plus Layer 5: Agent — LLM-powered autonomous reasoning and tool use.
 //!
 //! ## Layers
 //! - **Layer 0** `omega_hypercore` — Zero-allocation async runtime, persistent memory, capability security
@@ -8,12 +9,14 @@
 //! - **Layer 2** `omega_engineering` — Code generation, test harness, quality gates, PR automation
 //! - **Layer 3** `omega_evolution` — Self-evolution engine, competitive analysis, cross-project learning
 //! - **Layer 4** `omega_adapters` — OpenClaw / Hermes / OpenHuman / Feishu protocol adapters
+//! - **Layer 5** `omega_agent` — ReAct agent with LLM integration and tool system
 
 pub use omega_hypercore as hypercore;
 pub use omega_runtime as runtime;
 pub use omega_engineering as engineering;
 pub use omega_evolution as evolution;
 pub use omega_adapters as adapters;
+pub use omega_agent as agent;
 
 /// Top-level configuration
 #[derive(Debug, Clone)]
