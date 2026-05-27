@@ -9,6 +9,7 @@
 //!   omega-agi version                      Show version info
 
 use omega_agent::{llm::LLMClient, tools::ToolContext, tools::ToolResult, Agent};
+use omega_evolution::auto_evolve::{AutoEvolve, AutoEvolveConfig};
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
@@ -91,7 +92,7 @@ impl ToolContext for OmegaContext {
 
             // ── Evolution ──────────────────────────────────────────────
             "evolve" => {
-                let result = self.omega.evolution.evolver.evolve();
+                let result = self.omega.evolution.evolve();
                 let output = format!(
                     "Evolution cycle complete. success={}, final_score={:.4}, iterations={}, message={}",
                     result.success,
@@ -100,6 +101,34 @@ impl ToolContext for OmegaContext {
                     result.message,
                 );
                 ToolResult::ok("evolve", output)
+            }
+
+            // ── Full Evolution (Auto-Evolve Pipeline) ──────────────────
+            "evolve_full" => {
+                let mut auto = AutoEvolve::new(AutoEvolveConfig {
+                    workspace_root: "C:\\Users\\Fogtao\\Downloads\\omega-agi-supremacy".into(),
+                    ..AutoEvolveConfig::default()
+                });
+                let mut evolver = self.omega.evolution.lock_evolver();
+                let result = auto.run_once(&mut evolver);
+                let output = format!(
+                    "Auto-evolve cycle complete.\n\
+                     ├─ Evolution: success={}, final_score={:.4}, iterations={}\n\
+                     ├─ Tests passed: {}\n\
+                     ├─ Fix attempts: {}\n\
+                     ├─ Files generated: {}\n\
+                     ├─ Duration: {}ms\n\
+                     └─ Commit: {}",
+                    result.evolution.success,
+                    result.evolution.final_score,
+                    result.evolution.iterations,
+                    result.all_passed,
+                    result.fix_attempts,
+                    result.generated_files.len(),
+                    result.duration_ms,
+                    result.commit_hash.as_deref().unwrap_or("none"),
+                );
+                ToolResult::ok("evolve_full", output)
             }
 
             // ── File Read ──────────────────────────────────────────────
@@ -369,7 +398,7 @@ async fn cmd_check() -> anyhow::Result<()> {
     println!("   omega-evolution:  v{}", omega_evolution::VERSION);
 
     // Evolution stats
-    let metrics = omega.evolution.evolver.get_metrics();
+    let metrics = omega.evolution.evolver.lock().unwrap().get_metrics().clone();
     println!("\n🧬 Evolution Engine:");
     println!("   Iterations: {}", metrics.iterations);
     println!("   Best score: {:.4}", metrics.best_score);

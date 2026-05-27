@@ -68,6 +68,11 @@ pub static ALL_TOOLS: &[ToolDescriptor] = &[
         args_json_schema: r#"{}"#,
     },
     ToolDescriptor {
+        name: "evolve_full",
+        description: "Run the complete auto-evolve cycle (evolve → generate → test → fix → commit). Automatically improves the system parameters and code.",
+        args_json_schema: r#"{}"#,
+    },
+    ToolDescriptor {
         name: "read",
         description: "Read the contents of a file from disk.",
         args_json_schema: r#"{"type":"object","properties":{"path":{"type":"string","description":"Absolute path to the file"}},"required":["path"]}"#,

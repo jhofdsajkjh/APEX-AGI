@@ -1,54 +1,31 @@
-version: '3.8'
-
 services:
-  omega-core:
+  omega-agi:
     build:
       context: .
       dockerfile: Dockerfile
-    image: omega-agi/core:latest
-    container_name: omega-core
+    container_name: omega-agi
     ports:
       - "8080:8080"
-      - "9090:9090"
     environment:
-      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - OMEGA_MODE=${OMEGA_MODE:-production}
+      - OMEGA_API_KEY=${OMEGA_API_KEY:-}
+      - OMEGA_API_URL=${OMEGA_API_URL:-https://api.openai.com/v1}
+      - OMEGA_MODEL_NAME=${OMEGA_MODEL_NAME:-gpt-4o}
+      - OMEGA_MAX_TOKENS=${OMEGA_MAX_TOKENS:-4096}
+      - OMEGA_TEMPERATURE=${OMEGA_TEMPERATURE:-0.7}
+      - OMEGA_LLM_PROVIDER=${OMEGA_LLM_PROVIDER:-openai}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - RUST_LOG=${RUST_LOG:-info}
-      - HOST=0.0.0.0
-      - PORT=8080
-      - METRICS_PORT=9090
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - OMEGA_DATA_DIR=/workspace/data
     volumes:
-      - ./data:/opt/omega-agi/data
-    networks:
-      - omega-net
+      - omega_data:/workspace/data
+      - .:/workspace:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      test: ["CMD", "omega-agi", "check"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 5s
 
-  omega-evolution:
-    image: omega-agi/core:latest
-    container_name: omega-evolution
-    depends_on:
-      omega-core:
-        condition: service_healthy
-    environment:
-      - OMEGA_CORE_URL=http://omega-core:8080
-      - OMEGA_MODE=${OMEGA_MODE:-production}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - RUST_LOG=${RUST_LOG:-info}
-      - ENABLE_EVOLUTION=${ENABLE_EVOLUTION:-true}
-    volumes:
-      - ./data/evolution:/opt/omega-agi/evolution_runs
-    networks:
-      - omega-net
-    restart: unless-stopped
-    command: ["python3", "omega_pipeline/self_evolution_loop.py", "--auto"]
-
-networks:
-  omega-net:
-    driver: bridge
+volumes:
+  omega_data:
