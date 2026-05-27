@@ -1,0 +1,24 @@
+[package]
+name = "omega-agi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+omega-hypercore = { path = "hypercore" }
+omega-runtime = { path = "runtime" }
+omega-engineering = { path = "engineering" }
+omega-evolution = { path = "evolution" }
+omega-adapters = { path = "adapters" }
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[workspace]
+members = ["hypercore", "runtime", "engineering", "evolution", "adapters"]
+
+[features]
+default = ["full"]
+full = []

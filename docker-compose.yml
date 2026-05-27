@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  omega-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: omega-agi/core:latest
+    container_name: omega-core
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - OMEGA_MODE=${OMEGA_MODE:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - RUST_LOG=${RUST_LOG:-info}
+      - HOST=0.0.0.0
+      - PORT=8080
+      - METRICS_PORT=9090
+    volumes:
+      - ./data:/opt/omega-agi/data
+    networks:
+      - omega-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  omega-evolution:
+    image: omega-agi/core:latest
+    container_name: omega-evolution
+    depends_on:
+      omega-core:
+        condition: service_healthy
+    environment:
+      - OMEGA_CORE_URL=http://omega-core:8080
+      - OMEGA_MODE=${OMEGA_MODE:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - RUST_LOG=${RUST_LOG:-info}
+      - ENABLE_EVOLUTION=${ENABLE_EVOLUTION:-true}
+    volumes:
+      - ./data/evolution:/opt/omega-agi/evolution_runs
+    networks:
+      - omega-net
+    restart: unless-stopped
+    command: ["python3", "omega_pipeline/self_evolution_loop.py", "--auto"]
+
+networks:
+  omega-net:
+    driver: bridge
