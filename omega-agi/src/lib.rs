@@ -1,7 +1,6 @@
 //! # OMEGA AGI Supremacy
 //!
-//! Five-layer AGI system: HyperCore → Runtime → Engineering → Evolution → Pipeline.
-//! Plus Layer 5: Agent — LLM-powered autonomous reasoning and tool use.
+//! Ten-layer AGI system: HyperCore → Runtime → Engineering → Evolution → Pipeline → Agent → Research → Life-Harness → Superpowers → Avatar.
 //!
 //! ## Layers
 //! - **Layer 0** `omega_hypercore` — Zero-allocation async runtime, persistent memory, capability security
@@ -10,6 +9,10 @@
 //! - **Layer 3** `omega_evolution` — Self-evolution engine, competitive analysis, cross-project learning
 //! - **Layer 4** `omega_adapters` — OpenClaw / Hermes / OpenHuman / Feishu protocol adapters
 //! - **Layer 5** `omega_agent` — ReAct agent with LLM integration and tool system
+//! - **Layer 6** `omega_research` — Autonomous research engine with web search and report generation
+//! - **Layer 7** `omega_life_harness` — System self-maintenance, heartbeat, auto-recovery
+//! - **Layer 8** `omega_superpowers` — Auto-optimization, performance boost, self-healing
+//! - **Layer 9** `omega_avatar` — Local human-like AI avatar with TUI interface
 
 pub use omega_hypercore as hypercore;
 pub use omega_runtime as runtime;
@@ -17,6 +20,10 @@ pub use omega_engineering as engineering;
 pub use omega_evolution as evolution;
 pub use omega_adapters as adapters;
 pub use omega_agent as agent;
+pub use omega_research as research;
+pub use omega_life_harness as life_harness;
+pub use omega_superpowers as superpowers;
+pub use omega_avatar as avatar;
 
 /// Top-level configuration
 #[derive(Debug, Clone)]
@@ -52,7 +59,7 @@ impl Default for Config {
     }
 }
 
-/// Main OMEGA AGI entry point
+/// Main OMEGA AGI entry point — all 10 layers
 pub struct OmegaAGI {
     pub config: Config,
     pub hypercore: omega_hypercore::HyperCore,
@@ -60,6 +67,10 @@ pub struct OmegaAGI {
     pub engineering: omega_engineering::Engineering,
     pub evolution: omega_evolution::Evolution,
     pub adapters: omega_adapters::AdapterManager,
+    pub research: omega_research::Researcher,
+    pub life_harness: omega_life_harness::LifeHarness,
+    pub superpowers: omega_superpowers::Superpowers,
+    pub avatar: omega_avatar::AvatarEngine,
 }
 
 impl OmegaAGI {
@@ -77,6 +88,10 @@ impl OmegaAGI {
             engineering: omega_engineering::Engineering::new(),
             evolution: omega_evolution::Evolution::new(),
             adapters: omega_adapters::AdapterManager::new(),
+            research: omega_research::Researcher::new(),
+            life_harness: omega_life_harness::LifeHarness::new(),
+            superpowers: omega_superpowers::Superpowers::new(),
+            avatar: omega_avatar::AvatarEngine::new(),
             config,
         })
     }
@@ -86,6 +101,6 @@ impl OmegaAGI {
     }
 
     pub fn layer_count(&self) -> usize {
-        5
+        10
     }
 }

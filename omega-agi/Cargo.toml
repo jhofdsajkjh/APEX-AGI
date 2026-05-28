@@ -10,6 +10,10 @@ omega-engineering = { path = "engineering" }
 omega-evolution = { path = "evolution" }
 omega-adapters = { path = "adapters" }
 omega-agent = { path = "agent" }
+omega-research = { path = "research" }
+omega-life-harness = { path = "life_harness" }
+omega-superpowers = { path = "superpowers" }
+omega-avatar = { path = "avatar" }
 tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -20,7 +24,7 @@ dotenvy = "0.15"
 async-trait = "0.1"
 
 [workspace]
-members = ["hypercore", "runtime", "engineering", "evolution", "adapters", "agent"]
+members = ["hypercore", "runtime", "engineering", "evolution", "adapters", "agent", "research", "life_harness", "superpowers", "avatar"]
 
 [features]
 default = ["full"]
