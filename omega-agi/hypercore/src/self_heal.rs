@@ -6,7 +6,6 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
@@ -153,7 +152,7 @@ impl RetryPolicy {
     }
 
     /// Default retry policy: 100ms initial, 30s max, 2x multiplier, 3 retries.
-    pub fn default() -> Self {
+    pub fn default_policy() -> Self {
         Self {
             initial_delay_ms: 100,
             max_delay_ms: 30_000,
@@ -817,7 +816,7 @@ impl SelfHealingController {
             events: Vec::new(),
             event_counter: AtomicU64::new(1),
             circuit_breaker: CircuitBreaker::new(),
-            retry_policy: RetryPolicy::default(),
+            retry_policy: RetryPolicy::default_policy(),
         }
     }
 
@@ -1181,7 +1180,7 @@ mod tests {
 
     #[test]
     fn test_retry_executor_success() {
-        let policy = RetryPolicy::default();
+        let policy = RetryPolicy::default_policy();
         let success = || -> Result<i32, String> { Ok(42) };
         let mut exec = RetryExecutor::new(&policy);
         let result = exec.execute(success, default_classify);

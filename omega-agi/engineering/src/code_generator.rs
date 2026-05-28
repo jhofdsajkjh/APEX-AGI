@@ -5,7 +5,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::{Command, Stdio};
-use std::time::Duration;
 use thiserror::Error;
 
 // ============================================================================
@@ -515,7 +514,7 @@ impl TemplateLibrary {
     pub fn add_template(&mut self, category: &str, template: String) {
         self.templates
             .entry(category.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(template);
     }
 

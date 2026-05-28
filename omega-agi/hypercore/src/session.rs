@@ -4,13 +4,11 @@
 //! Each session has its own security context and memory scope.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -205,7 +203,7 @@ impl SessionManager {
 
     /// Create a new session with auto-generated ID
     pub fn create(&self) -> String {
-        let id = format!("sess_{}", Uuid::new_v4().to_string()[..8].to_string());
+        let id = format!("sess_{}", &Uuid::new_v4().to_string()[..8]);
         let session = Session::new(&id, self.config.clone());
         self.sessions.insert(id.clone(), session);
         info!(session_id = %id, "Session created");

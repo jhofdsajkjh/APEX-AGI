@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 /// Security ring levels (lower number = more privileged)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SecurityRing {
     /// Ring 0: Kernel-level access (full system control)
     Kernel = 0,
@@ -19,13 +19,8 @@ pub enum SecurityRing {
     /// Ring 2: Supervisor-level (agent orchestration)
     Supervisor = 2,
     /// Ring 3: User-level (restricted task execution)
+    #[default]
     User = 3,
-}
-
-impl Default for SecurityRing {
-    fn default() -> Self {
-        SecurityRing::User
-    }
 }
 
 impl fmt::Display for SecurityRing {

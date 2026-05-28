@@ -4,7 +4,6 @@
 //! Supports typed allocations, reset, and memory statistics.
 
 use std::fs::OpenOptions;
-use std::mem;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -99,6 +98,7 @@ impl MemoryPool {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&path)
             .context("Failed to open memory pool file")?;
 

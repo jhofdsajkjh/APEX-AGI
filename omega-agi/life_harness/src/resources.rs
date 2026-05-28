@@ -21,6 +21,7 @@ pub struct ResourceSample {
 pub struct ResourceMonitor {
     interval: u64,
     history: Arc<RwLock<Vec<ResourceSample>>>,
+    #[allow(dead_code)]
     current: Arc<RwLock<Option<ResourceSample>>>,
     system: Arc<Mutex<System>>,
     initialized: Arc<Mutex<bool>>,

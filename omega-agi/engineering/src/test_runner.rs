@@ -133,6 +133,7 @@ impl TestHarness {
     }
 
     /// Parse the summary line `test result: ok|FAILED. N passed; M failed; ...`
+    #[allow(dead_code)]
     fn parse_summary_line(line: &str) -> Option<(bool, usize, usize)> {
         let re =
             Regex::new(r"test result:\s+(ok|FAILED)\.\s*(\d+)\s+passed;\s*(\d+)\s+failed").ok()?;
@@ -339,7 +340,7 @@ impl TestHarness {
             }
         };
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let _stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
 
         let passed = output.status.success();

@@ -16,7 +16,7 @@ use tokio::task::JoinHandle;
 use tracing::{debug, info, warn};
 
 /// Unique task identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TaskId(u64);
 
 impl TaskId {
@@ -33,18 +33,13 @@ impl std::fmt::Display for TaskId {
 }
 
 /// Task priority levels (higher = more urgent)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TaskPriority {
     Low = 0,
+    #[default]
     Normal = 1,
     High = 2,
     Critical = 3,
-}
-
-impl Default for TaskPriority {
-    fn default() -> Self {
-        TaskPriority::Normal
-    }
 }
 
 /// Task status lifecycle
@@ -62,7 +57,7 @@ pub enum TaskStatus {
 struct TaskEntry {
     id: TaskId,
     priority: TaskPriority,
-    created_at: Instant,
+    _created_at: Instant,
     deadline: Option<Instant>,
     handle: Option<JoinHandle<()>>,
 }
@@ -148,7 +143,7 @@ impl TaskScheduler {
         let entry = TaskEntry {
             id,
             priority,
-            created_at: Instant::now(),
+            _created_at: Instant::now(),
             deadline: None,
             handle: None,
         };
@@ -157,7 +152,7 @@ impl TaskScheduler {
 
         let start = Instant::now();
 
-        let handle = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             if let Some(mut status) = tasks.get_mut(&id) {
                 *status = TaskStatus::Running;
             }
@@ -292,7 +287,7 @@ impl TaskScheduler {
         let entry = TaskEntry {
             id,
             priority,
-            created_at: Instant::now(),
+            _created_at: Instant::now(),
             deadline: Some(Instant::now() + deadline),
             handle: Some(handle),
         };
