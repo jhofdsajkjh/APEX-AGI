@@ -26,11 +26,11 @@ pub use apex_core::{
 /// Evolution engine version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-use std::sync::Mutex;
+use tokio::sync::RwLock;
 
-/// Top-level evolution module wrapper.
+/// Top-level evolution module wrapper — async-safe (uses tokio::sync::RwLock).
 pub struct Evolution {
-    pub evolver: Mutex<SelfEvolver>,
+    pub evolver: RwLock<SelfEvolver>,
     pub config: EvolverConfig,
 }
 
@@ -38,26 +38,26 @@ impl Evolution {
     pub fn new() -> Self {
         let config = EvolverConfig::default();
         Self {
-            evolver: Mutex::new(SelfEvolver::new(config.clone())),
+            evolver: RwLock::new(SelfEvolver::new(config.clone())),
             config,
         }
     }
 
     pub fn with_config(config: EvolverConfig) -> Self {
         Self {
-            evolver: Mutex::new(SelfEvolver::new(config.clone())),
+            evolver: RwLock::new(SelfEvolver::new(config.clone())),
             config,
         }
     }
 
-    /// Run one evolution cycle (thread-safe, locks the evolver internally).
-    pub fn evolve(&self) -> EvolutionResult {
-        self.evolver.lock().unwrap().evolve()
+    /// Run one evolution cycle (async-safe, uses tokio RwLock internally).
+    pub async fn evolve(&self) -> EvolutionResult {
+        self.evolver.write().await.evolve()
     }
 
     /// Access the locked evolver for custom operations.
-    pub fn lock_evolver(&self) -> std::sync::MutexGuard<'_, SelfEvolver> {
-        self.evolver.lock().unwrap()
+    pub async fn lock_evolver(&self) -> tokio::sync::RwLockWriteGuard<'_, SelfEvolver> {
+        self.evolver.write().await
     }
 }
 

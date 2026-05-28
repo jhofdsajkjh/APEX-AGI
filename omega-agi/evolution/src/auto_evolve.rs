@@ -221,10 +221,10 @@ impl AutoEvolve {
         // Compute APEX-driven fitness using the Φ_APEX*∞ formula
         let metrics = evolver.get_metrics();
         let apex_input = ApexInput::new(
-            metrics.generation_count,
+            metrics.iterations,
             base_fitness,
             evolver.best_score(),
-            metrics.fitness_history.clone(),
+            evolver.get_snapshots().iter().map(|s| s.score).collect::<Vec<f64>>(),
             evolver.get_diversity(),
             evolver.config().population_size as usize,
             evolver.get_current_genome().learning_rate,
@@ -256,7 +256,7 @@ impl AutoEvolve {
         if base_fitness > 0.0 {
             tracing::info!(
                 "[AutoEvolve] Φ_APEX*∞: fitness={:.6} → final_score={:.4} | ΔG={:.4} Ψ_con={:.4} Φ_feel={:.4} Γ={:.4}",
-                apex_fit, result.final_score,
+                apex_fit, result.evolution.final_score,
                 apex_state.base_grad, apex_state.consciousness,
                 apex_state.feeling, apex_state.wakefulness,
             );
@@ -281,10 +281,10 @@ impl AutoEvolve {
         // Step 1: 计算 APEX 适应度
         let metrics = evolver.get_metrics();
         let apex_input = ApexInput::new(
-            metrics.generation_count,
+            metrics.iterations,
             evolver.current_score(),
             evolver.best_score(),
-            metrics.fitness_history.clone(),
+            evolver.get_snapshots().iter().map(|s| s.score).collect::<Vec<f64>>(),
             evolver.get_diversity(),
             evolver.config().population_size as usize,
             evolver.get_current_genome().learning_rate,

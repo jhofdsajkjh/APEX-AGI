@@ -234,6 +234,11 @@ impl OpenClawAdapter {
         }
     }
 
+    /// Get adapter info
+    pub fn adapter_info(&self) -> AdapterInfo {
+        self.info.clone()
+    }
+
     /// Parse incoming message from OpenClaw webhook/event
     pub fn parse_event(&self, payload: &[u8]) -> Result<OpenClawAgentMessage> {
         serde_json::from_slice(payload).map_err(|e| anyhow::anyhow!("Failed to parse OpenClaw event: {}", e))

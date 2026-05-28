@@ -1,0 +1,94 @@
+# =============================================================================
+# ΩMEGA AGI SUPREMACY — Docker Compose 生产部署
+# =============================================================================
+version: "3.9"
+
+networks:
+  omega-net:
+    driver: bridge
+
+volumes:
+  omega-data:
+    driver: local
+  omega-memory:
+    driver: local
+
+services:
+  # ── 主 AGI 服务 ──
+  omega-agi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - omega-agi:latest
+    image: omega-agi:latest
+    container_name: omega-agi
+    hostname: omega-agi
+    networks:
+      - omega-net
+    ports:
+      # API / 管理接口（预留）
+      - "8080:8080"
+    volumes:
+      # 持久化数据
+      - omega-data:/var/lib/omega/data
+      - omega-memory:/var/lib/omega/data/memory
+      # 可选：挂载 .env 配置
+      - ./.env:/var/lib/omega/.env:ro
+    environment:
+      - OMEGA_LOG_LEVEL=${OMEGA_LOG_LEVEL:-info}
+      - OMEGA_DATA_DIR=/var/lib/omega/data
+      - OMEGA_TRANSCENDENCE=${OMEGA_TRANSCENDENCE:-true}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    env_file:
+      - .env
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "omega-agi", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+
+  # ── OpenClaw 协议适配器 ──
+  omega-adapter-openclaw:
+    image: omega-agi:latest
+    container_name: omega-adapter-openclaw
+    hostname: omega-adapter-openclaw
+    networks:
+      - omega-net
+    depends_on:
+      omega-agi:
+        condition: service_healthy
+    environment:
+      - OMEGA_LOG_LEVEL=${OMEGA_LOG_LEVEL:-info}
+      - OPENCLAW_ENDPOINT=http://0.0.0.0:9090
+    command: ["adapters", "start", "openclaw"]
+    restart: unless-stopped
+    profiles:
+      - full
+
+  # ── 研究引擎缓存 ──
+  omega-research-cache:
+    image: redis:7-alpine
+    container_name: omega-research-cache
+    hostname: omega-research-cache
+    networks:
+      - omega-net
+    volumes:
+      - omega-data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    profiles:
+      - full
+      - research

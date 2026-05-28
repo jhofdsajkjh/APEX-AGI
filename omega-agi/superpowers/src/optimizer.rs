@@ -64,7 +64,7 @@ impl Optimizer {
         params.concurrency = (4 + (*count as u32 % 3)).max(2);
         params.batch_size = (16 + (*count as u32 % 8)).max(4);
         params.cache_ttl_secs = 300 + (*count as u64 % 60);
-        params.timeout_ms = (30000 - (*count as u32 % 5000)).max(5000);
+        params.timeout_ms = (30000 - (*count as u32 % 5000)).max(5000) as u64;
 
         let mut level = self.level.write().await;
         *level = (0.75 + improvement).min(0.99);

@@ -1,0 +1,23 @@
+# Auto detect text files and convert to LF on commit
+* text=auto
+
+# Shell scripts must stay LF
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Rust source
+*.rs text eol=lf
+
+# Config files
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Docker
+Dockerfile text eol=lf
+
+# Windows batch files stay CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf

@@ -24,7 +24,7 @@ pub mod display;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use character::{Character, CharacterId, EmotionalState};
-use chat::{ChatEngine, ChatMessage, ChatHistory};
+use chat::{ChatEngine, ChatMessage};
 use display::DisplayRenderer;
 use tui::TuiSession;
 
@@ -74,6 +74,7 @@ pub struct AvatarEngine {
     character: Arc<RwLock<Character>>,
     chat: Arc<RwLock<ChatEngine>>,
     display: DisplayRenderer,
+    emotional_history: Arc<RwLock<Vec<String>>>,
     session_start: std::time::Instant,
 }
 
@@ -94,6 +95,7 @@ impl AvatarEngine {
             character: Arc::new(RwLock::new(character)),
             chat: Arc::new(RwLock::new(chat)),
             display: DisplayRenderer::new(),
+            emotional_history: Arc::new(RwLock::new(Vec::new())),
             session_start: std::time::Instant::now(),
         }
     }
@@ -104,7 +106,23 @@ impl AvatarEngine {
             let chat = self.chat.read().await;
             chat.respond(user_input)
         };
+        let emotion = if reply.contains('?') {
+            "curious"
+        } else if reply.contains('!') {
+            "excited"
+        } else if reply.len() > 100 {
+            "thoughtful"
+        } else {
+            "neutral"
+        };
+        self.record_emotion(emotion).await;
         Ok(reply)
+    }
+
+    /// Record an emotion in the emotional history
+    pub async fn record_emotion(&self, emotion: &str) {
+        let mut history = self.emotional_history.write().await;
+        history.push(emotion.to_string());
     }
 
     /// Add a message to the conversation history
@@ -171,16 +189,7 @@ impl AvatarEngine {
         let character = self.character.read().await;
         let chat = self.chat.read().await;
         let history = chat.history();
-        let emotions: Vec<String> = history
-            .iter()
-            .filter_map(|m| {
-                if m.role == "assistant" {
-                    Some(format!("{:.20}", m.content))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let emotions = self.emotional_history.read().await;
 
         AvatarSession {
             character: character.name().to_string(),

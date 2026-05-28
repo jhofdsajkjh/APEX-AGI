@@ -149,6 +149,16 @@ impl ToolRegistry {
     }
 }
 
+impl Clone for ToolRegistry {
+    fn clone(&self) -> Self {
+        let mut tools = HashMap::new();
+        for (k, v) in &self.tools {
+            tools.insert(k.clone(), v.box_clone());
+        }
+        Self { tools }
+    }
+}
+
 impl Default for ToolRegistry {
     fn default() -> Self {
         Self::new()

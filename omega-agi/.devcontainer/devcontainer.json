@@ -1,12 +1,14 @@
 {
-  "name": "APEX-AGI Development",
+  "name": "ΩMEGA AGI SUPREMACY",
   "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-    "ghcr.io/devcontainers/features/rust:1": {
-      "version": "stable",
-      "components": ["rustfmt", "clippy"]
-    }
+  "forwardPorts": [8080],
+  "remoteUser": "codespace",
+  "containerEnv": {
+    "OMEGA_LOG_LEVEL": "info",
+    "OMEGA_DATA_DIR": "/workspaces/omega-agi/data",
+    "OMEGA_TRANSCENDENCE": "true"
   },
+  "postCreateCommand": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source $HOME/.cargo/env && cargo check",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -14,14 +16,15 @@
         "tamasfe.even-better-toml",
         "serayuzgur.crates",
         "vadimcn.vscode-lldb",
-        "fill-labs.dependi"
+        "GitHub.copilot",
+        "eamodio.gitlens"
       ],
       "settings": {
-        "rust-analyzer.check.command": "clippy",
-        "rust-analyzer.cargo.allFeatures": true
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "rust-analyzer.cargo.allFeatures": true,
+        "editor.formatOnSave": true,
+        "editor.rulers": [100, 120]
       }
     }
-  },
-  "postCreateCommand": "rustc --version && cargo --version && echo '✓ Rust toolchain ready'",
-  "forwardPorts": [3000]
+  }
 }

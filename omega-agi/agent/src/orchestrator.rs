@@ -26,7 +26,7 @@ use tokio::sync::{RwLock, mpsc};
 
 use crate::inference::{self, InferenceEngine, Message};
 use crate::memory::{LongTermMemory, MemoryConfig, MemoryType};
-use crate::tool::{Tool, ToolRegistry, ToolResult};
+use crate::tool::{ToolRegistry, ToolResult};
 use crate::feedback::FeedbackCollector;
 
 // ---------------------------------------------------------------------------

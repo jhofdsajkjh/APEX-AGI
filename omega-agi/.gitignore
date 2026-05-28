@@ -1,0 +1,37 @@
+# =============================================================================
+# ΩMEGA AGI SUPREMACY — .gitignore
+# =============================================================================
+
+# Rust 构建产物
+target/
+**/*.rs.bk
+
+# 环境配置（含密钥）
+.env
+!.env.example
+
+# 数据目录
+data/
+*.db
+*.sqlite
+memory/
+
+# IDE / 编辑器
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 日志
+*.log
+logs/
+
+# 操作系统
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Docker
+.docker/

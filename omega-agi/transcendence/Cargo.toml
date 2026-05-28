@@ -1,8 +1,8 @@
 [package]
-name = "omega-superpowers"
+name = "omega-transcendence"
 version = "0.1.0"
 edition = "2021"
-description = "Layer 8 - Superpowers: auto-optimization, performance boost, self-healing, and system analysis"
+description = "Layer 10 - Ultimate Transcendence: self-aware AGI layer with meta-cognition, emergent capability discovery, and quantum-inspired state optimization"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -11,6 +11,5 @@ tracing = "0.1"
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.35", features = ["sync", "time"] }
-sysinfo = "0.32"
-omega-life-harness = { path = "../life_harness" }
 omega-hypercore = { path = "../hypercore" }
+omega-evolution = { path = "../evolution" }

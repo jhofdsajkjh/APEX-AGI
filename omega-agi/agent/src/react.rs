@@ -4,7 +4,6 @@
 //! The LLM decides when it has enough information to produce the final answer.
 
 use crate::inference::{InferenceEngine, Message};
-use crate::tool::{ToolContext, ToolResult};
 use tracing::{debug, info, warn};
 
 // ---------------------------------------------------------------------------
@@ -75,7 +74,7 @@ Important rules:
 4. When you have enough information, produce `Answer:` with the final response.
 5. If a tool fails, try an alternative approach or explain the error.
 6. Be thorough — check system health first if the task is unclear.
-7. You operate inside the OMEGA AGI project at C:\Users\Fogtao\Downloads\omega-agi-supremacy.
+7. You operate inside the OMEGA AGI SUPREMACY project — an 11-layer autonomous AGI system.
 "#,
         tool_descriptions_prompt()
     )
@@ -188,4 +187,5 @@ impl ReActEngine {
 }
 
 // Re-export from tools module for backward compatibility
-pub use crate::tools::{tool_descriptions_prompt, ToolContext, ToolResult};
+pub use crate::tools::{tool_descriptions_prompt, ToolContext};
+pub use crate::tool::ToolResult;

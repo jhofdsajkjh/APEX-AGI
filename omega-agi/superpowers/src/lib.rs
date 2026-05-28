@@ -24,7 +24,7 @@ pub mod analyzer;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use optimizer::Optimizer;
-use boost::{BoostManager, BoostMode};
+pub use boost::{BoostManager, BoostMode};
 use self_heal::SelfHealEngine;
 use analyzer::{Analyzer, AnalysisReport};
 
@@ -97,7 +97,7 @@ impl Superpowers {
     }
 
     /// Activate a performance boost mode
-    pub fn activate_boost(&mut self, mode: BoostMode) -> String {
+    pub fn activate_boost(&self, mode: BoostMode) -> String {
         let result = self.boost.activate(mode);
         tracing::info!(mode = ?mode, "Boost mode activated");
         result

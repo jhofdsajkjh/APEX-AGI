@@ -173,7 +173,12 @@ pub struct LongTermMemory {
     id_counter: RwLock<u64>,
 
     /// DB connection (SQLite, created on first write).
+    #[cfg(feature = "sqlite")]
     db: RwLock<Option<rusqlite::Connection>>,
+
+    /// DB connection stub (in-memory only)
+    #[cfg(not(feature = "sqlite"))]
+    db: RwLock<Option<()>>,
 }
 
 impl LongTermMemory {
@@ -194,6 +199,7 @@ impl LongTermMemory {
         };
 
         // Attempt to open DB and load persisted entries
+        #[cfg(feature = "sqlite")]
         if !s.config.db_path.is_empty() {
             if let Ok(db) = s.open_db() {
                 if let Ok(entries) = s.load_all_from_db(&db) {
@@ -206,11 +212,16 @@ impl LongTermMemory {
                 }
             }
         }
+        #[cfg(not(feature = "sqlite"))]
+        {
+            let _ = &s.config;
+        }
 
         s
     }
 
     /// Open the SQLite database (creates tables if needed).
+    #[cfg(feature = "sqlite")]
     fn open_db(&self) -> anyhow::Result<rusqlite::Connection> {
         let db = rusqlite::Connection::open(&self.config.db_path)?;
         db.execute_batch(
@@ -233,6 +244,7 @@ impl LongTermMemory {
         Ok(db)
     }
 
+    #[cfg(feature = "sqlite")]
     fn load_all_from_db(&self, db: &rusqlite::Connection) -> anyhow::Result<Vec<MemoryEntry>> {
         let mut stmt = db.prepare(
             "SELECT id, timestamp, agent_id, memory_type, content, importance, \
@@ -290,10 +302,11 @@ impl LongTermMemory {
             buf.pop_front();
         }
         buf.push_back(entry);
+        let buf_len = buf.len();
         drop(buf);
 
         // Auto-consolidate if buffer is full enough
-        if buf.len() % self.config.consolidate_every == 0 {
+        if buf_len % self.config.consolidate_every == 0 {
             let _ = self.consolidate().await;
         }
 
@@ -410,7 +423,8 @@ impl LongTermMemory {
     /// Consolidate: embed un-embedded entries and persist to DB.
     pub async fn consolidate(&self) -> anyhow::Result<usize> {
         let mut buf = self.buffer.write().await;
-        let to_consolidate: Vec<MemoryEntry> = buf.drain(..buf.len()).collect();
+        let len = buf.len();
+        let to_consolidate: Vec<MemoryEntry> = buf.drain(..len).collect();
         drop(buf);
 
         if to_consolidate.is_empty() {
@@ -435,39 +449,44 @@ impl LongTermMemory {
             })
             .collect();
 
-        // Persist to DB
-        if let Ok(mut db) = self.db.try_write() {
-            if db.is_none() {
-                if let Ok(new_db) = self.open_db() {
-                    *db = Some(new_db);
+        // Persist to DB (only with sqlite feature)
+        #[cfg(feature = "sqlite")]
+        {
+            if let Ok(mut db) = self.db.try_write() {
+                if db.is_none() {
+                    if let Ok(new_db) = self.open_db() {
+                        *db = Some(new_db);
+                    }
                 }
-            }
-            if let Some(ref conn) = *db {
-                for entry in &entries_with_emb {
-                    let tags_str = serde_json::to_string(&entry.tags).unwrap_or_default();
-                    let emb_blob = entry.embedding.as_ref()
-                        .map(|v| {
-                            v.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>()
-                        });
-                    let mem_type_str = format!("{:?}", entry.memory_type).to_lowercase();
-                    let _ = conn.execute(
-                        "INSERT OR REPLACE INTO memories (id, timestamp, agent_id, memory_type, content, embedding, importance, access_count, tags, consolidated)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1)",
-                        rusqlite::params![
-                            entry.id,
-                            entry.timestamp.to_rfc3339(),
-                            entry.agent_id,
-                            mem_type_str,
-                            entry.content,
-                            emb_blob,
-                            entry.importance,
-                            entry.access_count,
-                            tags_str,
-                        ],
-                    );
+                if let Some(ref conn) = *db {
+                    for entry in &entries_with_emb {
+                        let tags_str = serde_json::to_string(&entry.tags).unwrap_or_default();
+                        let emb_blob = entry.embedding.as_ref()
+                            .map(|v| {
+                                v.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>()
+                            });
+                        let mem_type_str = format!("{:?}", entry.memory_type).to_lowercase();
+                        let _ = conn.execute(
+                            "INSERT OR REPLACE INTO memories (id, timestamp, agent_id, memory_type, content, embedding, importance, access_count, tags, consolidated)
+                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1)",
+                            rusqlite::params![
+                                entry.id,
+                                entry.timestamp.to_rfc3339(),
+                                entry.agent_id,
+                                mem_type_str,
+                                entry.content,
+                                emb_blob,
+                                entry.importance,
+                                entry.access_count,
+                                tags_str,
+                            ],
+                        );
+                    }
                 }
             }
         }
+        #[cfg(not(feature = "sqlite"))]
+        { /* in-memory only — no DB persistence */ }
 
         // Merge into consolidated store
         let mut consolidated = self.consolidated.write().await;
@@ -560,7 +579,8 @@ impl LongTermMemory {
         buf.clear();
         let mut consolidated = self.consolidated.write().await;
         consolidated.clear();
-        if let Ok(ref mut db) = *self.db.write().await {
+        #[cfg(feature = "sqlite")]
+        if let Some(ref mut db) = *self.db.write().await {
             let _ = db.execute("DELETE FROM memories WHERE agent_id = ?1", [&self.agent_id]);
         }
     }

@@ -234,6 +234,7 @@ impl FeedbackCollector {
             recommendations.push("System is stable. Focus on performance optimization or new features.".into());
         }
 
+        let num_changes = recent.len();
         drop(scores);
 
         let report = FeedbackReport {
@@ -244,7 +245,7 @@ impl FeedbackCollector {
             test_score: test_avg,
             quality_score: quality_avg,
             runtime_score: runtime_avg,
-            num_changes: recent.len(),
+            num_changes,
             summary,
             recommendations,
         };

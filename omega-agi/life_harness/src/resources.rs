@@ -1,10 +1,11 @@
 //! Resource monitoring — system resource tracking
 //!
 //! Monitors CPU, memory, disk, and network resources.
-//! Uses simulated metrics with a real-time sampling approach.
+//! Uses the sysinfo crate for real system metrics.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
+use sysinfo::{Disks, Networks, System, MINIMUM_CPU_UPDATE_INTERVAL};
 
 /// A resource sample at a point in time
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -21,6 +22,8 @@ pub struct ResourceMonitor {
     interval: u64,
     history: Arc<RwLock<Vec<ResourceSample>>>,
     current: Arc<RwLock<Option<ResourceSample>>>,
+    system: Arc<Mutex<System>>,
+    initialized: Arc<Mutex<bool>>,
 }
 
 impl ResourceMonitor {
@@ -29,6 +32,8 @@ impl ResourceMonitor {
             interval,
             history: Arc::new(RwLock::new(Vec::new())),
             current: Arc::new(RwLock::new(None)),
+            system: Arc::new(Mutex::new(System::new_all())),
+            initialized: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -51,24 +56,41 @@ impl ResourceMonitor {
     }
 
     async fn collect(&self) -> ResourceSample {
-        // Simulated resource metrics (in production, use sysinfo crate)
-        use std::time::{SystemTime, UNIX_EPOCH};
+        let mut system = self.system.lock().unwrap();
+        let mut initialized = self.initialized.lock().unwrap();
 
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
-        let seed = now.as_nanos();
+        // CPU needs two samples for delta calculation
+        if !*initialized {
+            // First call: just seed the data
+            system.refresh_cpu_usage();
+            std::thread::sleep(MINIMUM_CPU_UPDATE_INTERVAL);
+            system.refresh_cpu_usage();
+            *initialized = true;
+        } else {
+            system.refresh_cpu_usage();
+        }
 
-        // Deterministic pseudo-random variation based on time
-        let variation = |base: f64, amp: f64| -> f64 {
-            let phase = (seed % 1000) as f64 / 1000.0;
-            base + (phase * 2.0 - 1.0) * amp
-        };
+        let cpu_percent = system.global_cpu_usage() as f64;
+
+        // Memory (bytes → MB)
+        system.refresh_memory();
+        let used_bytes = system.total_memory() - system.available_memory();
+        let memory_mb = used_bytes as f64 / 1024.0 / 1024.0;
+
+        // Disk — use Disks API directly
+        let disks = Disks::new_with_refreshed_list();
+        let disk_gb: f64 = disks.list().iter().map(|d| d.total_space() as f64).sum::<f64>() / 1_000_000_000.0;
+
+        // Network — active if any interface exists (basic check)
+        let networks = Networks::new_with_refreshed_list();
+        let network_active = networks.list().iter().count() > 0;
 
         ResourceSample {
             timestamp: chrono::Utc::now().to_rfc3339(),
-            cpu_percent: variation(45.0, 30.0).max(0.0).min(100.0),
-            memory_mb: variation(512.0, 256.0).max(64.0),
-            disk_gb: variation(50.0, 10.0).max(1.0),
-            network_active: seed % 3 != 0,
+            cpu_percent,
+            memory_mb,
+            disk_gb,
+            network_active,
         }
     }
 

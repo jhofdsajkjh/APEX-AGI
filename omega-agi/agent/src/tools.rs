@@ -7,7 +7,7 @@ use crate::tool::{Tool, ToolRegistry, ToolResult as NewToolResult};
 use std::sync::Arc;
 
 // Re-export for backward compatibility
-pub use crate::tool::ToolResult;
+pub use crate::tool::ToolResult as InternalToolResult;
 
 /// Tool descriptor (kept for backward compatibility).
 #[derive(Debug, Clone, Serialize)]
@@ -79,7 +79,7 @@ pub static ALL_TOOLS: &[ToolDescriptor] = &[
 /// Abstract interface for the host application (kept for backward compatibility).
 #[async_trait]
 pub trait ToolContext: Send + Sync {
-    async fn execute_tool(&self, name: &str, args: &serde_json::Value) -> ToolResult;
+    async fn execute_tool(&self, name: &str, args: &serde_json::Value) -> InternalToolResult;
 }
 
 /// Render tool descriptions for system prompt (kept for backward compatibility).

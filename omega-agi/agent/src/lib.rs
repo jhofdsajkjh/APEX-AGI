@@ -67,14 +67,15 @@ impl Agent {
         tools: ToolRegistry,
         memory_config: MemoryConfig,
     ) -> Self {
-        let memory = LongTermMemory::new(memory_config, engine.clone(), &name);
+        let name_str: String = name.into();
+        let memory = LongTermMemory::new(memory_config, engine.clone(), &name_str);
         Self {
             engine,
             tools,
             memory,
             feedback_collector: None,
             feedback_integrator: None,
-            name: name.into(),
+            name: name_str,
             max_steps: 15,
         }
     }
@@ -212,27 +213,175 @@ Important rules:
     }
 
     fn parse_answer(&self, text: &str) -> Option<String> {
-        let idx = text.find("Answer:")?;
-        let after = &text[idx + "Answer:".len()..];
-        // If there's a "Action:" after Answer:, truncate
+        // === Strategy 1: Exact "Answer:" prefix (existing behavior) ===
+        if let Some(answer) = self.parse_answer_exact(text, "Answer:") {
+            return Some(answer);
+        }
+
+        // === Strategy 2: Broader case variations via manual search ===
+        for prefix in &[
+            "Answer:",
+            "answer:",
+            "ANSWER:",
+            "Final Answer:",
+            "final answer:",
+            "FINAL ANSWER:",
+            "Final answer:",
+        ] {
+            if let Some(answer) = self.parse_answer_exact(text, prefix) {
+                return Some(answer);
+            }
+        }
+
+        // === Strategy 3: Markdown format extraction ===
+        // Look for **Answer** pattern (bold in markdown)
+        if let Some(start) = text.find("**Answer**") {
+            let after = &text[start + "**Answer**".len()..];
+            let after = after.trim_start_matches(':').trim();
+            let end = after.find("\n**").or_else(|| after.find("\n\n")).unwrap_or(after.len());
+            let candidate = after[..end].trim();
+            if !candidate.is_empty() {
+                return Some(candidate.to_string());
+            }
+        }
+        if let Some(start) = text.find("**answer**") {
+            let after = &text[start + "**answer**".len()..];
+            let after = after.trim_start_matches(':').trim();
+            let end = after.find("\n**").or_else(|| after.find("\n\n")).unwrap_or(after.len());
+            let candidate = after[..end].trim();
+            if !candidate.is_empty() {
+                return Some(candidate.to_string());
+            }
+        }
+
+        // Look for blockquote > Answer pattern
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("> **Answer**") || trimmed.starts_with("> **answer**") {
+                let after = trimmed.trim_start_matches('>').trim();
+                let answer_text = after.trim_start_matches("**Answer**").trim();
+                let answer_text = answer_text.trim_start_matches("**answer**").trim();
+                let answer_text = answer_text.trim_start_matches(':').trim();
+                if !answer_text.is_empty() {
+                    return Some(answer_text.to_string());
+                }
+            }
+        }
+
+        // === Strategy 4: Last non-empty paragraph as fallback ===
+        let paragraphs: Vec<&str> = text
+            .split("\n\n")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && s.len() > 20)
+            .collect();
+        if let Some(last) = paragraphs.last() {
+            // Only use last paragraph if it looks like an answer (not an action or thought)
+            let lower = last.to_lowercase();
+            if !lower.starts_with("thought:") && !lower.starts_with("action:") && !lower.starts_with("tool:") {
+                return Some(last.to_string());
+            }
+        }
+
+        None
+    }
+
+    /// Helper: find a prefix and extract text after it, stopping at Action:\n
+    fn parse_answer_exact<'a>(&self, text: &'a str, prefix: &str) -> Option<String> {
+        let idx = text.find(prefix)?;
+        let after = &text[idx + prefix.len()..];
+        // Truncate at the next Action: line or double newline
         let end = after.find("\nAction:").unwrap_or(after.len());
         let end = after[..end].find("\n\n").unwrap_or(end);
-        Some(after[..end].trim().to_string())
+        let result = after[..end].trim().to_string();
+        if result.is_empty() {
+            None
+        } else {
+            Some(result)
+        }
     }
 
     fn parse_action(&self, text: &str) -> Option<(String, String)> {
-        let action_idx = text.find("Action:")?;
-        let after_action = &text[action_idx + "Action:".len()..];
+        // Find the action line: look for "Action:" or "Tool:" (alternative format)
+        let action_trigger = if let Some(pos) = text.find("Action:") {
+            (pos, "Action:")
+        } else if let Some(pos) = text.find("Tool:") {
+            (pos, "Tool:")
+        } else {
+            return None;
+        };
+
+        let (action_idx, trigger) = action_trigger;
+        let after_action = &text[action_idx + trigger.len()..];
         let action_line = after_action.lines().next()?.trim();
-        // Split on possible whitespace
         let action = action_line.split_whitespace().next()?.to_lowercase();
 
-        // Find Action Input
-        let input_idx = text.find("Action Input:")?;
-        let after_input = &text[input_idx + "Action Input:".len()..];
-        let input = after_input.lines().next().unwrap_or("{}").trim().to_string();
+        // Find Action Input: — search from after the action line onward
+        let remaining_after_action = &text[action_idx + trigger.len() + action_line.len()..];
+        let input_text = if let Some(input_idx) = remaining_after_action.find("Action Input:") {
+            let after_input = &remaining_after_action[input_idx + "Action Input:".len()..];
 
-        Some((action, input))
+            // Try same-line JSON first: trim and check if it starts with '{' or '['
+            let first_line = after_input.lines().next().unwrap_or("{}").trim().to_string();
+            if first_line.starts_with('{') || first_line.starts_with('[') {
+                // Same-line JSON — collect until the closing brace/bracket or next section
+                let mut depth: i32 = 0;
+                let mut json_buf = String::new();
+                let mut started = false;
+                for ch in first_line.chars() {
+                    match ch {
+                        '{' | '[' => { depth += 1; started = true; json_buf.push(ch); },
+                        '}' | ']' => { depth -= 1; json_buf.push(ch); if started && depth <= 0 { break; } },
+                        _ => if started { json_buf.push(ch); },
+                    }
+                }
+                if !json_buf.is_empty() && depth <= 0 {
+                    json_buf
+                } else {
+                    first_line
+                }
+            } else {
+                // JSON on next line(s) — collect subsequent lines until blank line or next section
+                let mut lines = after_input.lines();
+                lines.next(); // skip the (already captured) first line
+                let mut json_buf = first_line; // may contain partial JSON
+                let mut depth: i32 = 0;
+                for ch in json_buf.chars() {
+                    match ch {
+                        '{' | '[' => depth += 1,
+                        '}' | ']' => depth -= 1,
+                        _ => {},
+                    }
+                }
+                for line in lines {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() || trimmed.starts_with("Thought:") || trimmed.starts_with("Action:") || trimmed.starts_with("Tool:") || trimmed.starts_with("Answer:") {
+                        break;
+                    }
+                    for ch in trimmed.chars() {
+                        match ch {
+                            '{' | '[' => depth += 1,
+                            '}' | ']' => depth -= 1,
+                            _ => {},
+                        }
+                    }
+                    json_buf.push_str(trimmed);
+                    if depth <= 0 {
+                        break;
+                    }
+                }
+                json_buf
+            }
+        } else {
+            // No explicit "Action Input:" — try to grab JSON from the action line itself
+            let parts: Vec<&str> = action_line.split_whitespace().collect();
+            if parts.len() > 1 {
+                parts[1..].join(" ")
+            } else {
+                "{}".to_string()
+            }
+        };
+
+        Some((action, input_text))
     }
 
     fn truncate(&self, s: &str, max: usize) -> String {

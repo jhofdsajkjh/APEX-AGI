@@ -123,7 +123,7 @@ impl KnowledgeGraph {
                 let insight = format!(
                     "Cross-topic connection: '{}' links [{}]",
                     label,
-                    connected_topics.join(", ")
+                    connected_topics.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join(", ")
                 );
                 if !self.insights.contains(&insight) {
                     new_insights.push(insight);

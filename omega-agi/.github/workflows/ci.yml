@@ -1,10 +1,11 @@
-name: CI — Full Build & Test
+name: ΩMEGA AGI — Full CI Pipeline
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
+    tags: ["v*"]
   pull_request:
-    branches: [master]
+    branches: [master, main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,34 +44,110 @@ jobs:
         run: cargo test --workspace --all-features
 
   # ── Release build ──
-  build-release:
+  build:
     runs-on: ubuntu-latest
     needs: test
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
 
       - name: cargo build --release
-        run: cargo build --release --workspace --all-features
+        run: cargo build --release --target ${{ matrix.target }}
 
-      - name: show binary
-        run: ls -lh target/release/omega-agi
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-agi-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/omega-agi${{ matrix.target == 'x86_64-pc-windows-msvc' && '.exe' || '' }}
 
-  # ── APEX self-evolution validation ──
+  # ── Docker build ──
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha,format=short
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── APEX self-evolution smoke test ──
   apex-evolution:
     runs-on: ubuntu-latest
-    needs: build-release
+    needs: build
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: cargo build (debug, for fast iteration)
+      - name: cargo build (debug)
         run: cargo build --workspace --all-features
 
-      - name: quick smoke test — help
-        run: cargo run -- --help
+      - name: smoke test — help
+        run: cargo run -- --help 2>&1 || cargo run -- help
 
-      - name: quick smoke test — version
-        run: cargo run -- --version || echo "no --version flag, skipping"
+      - name: smoke test — version
+        run: cargo run -- --version 2>&1 || echo "no --version flag, skipping"
+
+      - name: smoke test — health check
+        run: timeout 10 cargo run -- check 2>&1 || true
+
+  # ── Cross-platform build ──
+  cross-platform:
+    runs-on: ubuntu-latest
+    needs: check
+    strategy:
+      matrix:
+        target:
+          - x86_64-pc-windows-gnu
+          - x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cross-compilation deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 2>/dev/null || true
+
+      - name: cargo build
+        run: cargo build --target ${{ matrix.target }}

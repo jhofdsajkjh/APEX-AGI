@@ -17,5 +17,5 @@ async-trait = "0.1"
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }
 
 [features]
-default = ["sqlite"]
+default = []
 sqlite = ["rusqlite"]

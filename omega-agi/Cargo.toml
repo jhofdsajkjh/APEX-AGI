@@ -14,6 +14,7 @@ omega-research = { path = "research" }
 omega-life-harness = { path = "life_harness" }
 omega-superpowers = { path = "superpowers" }
 omega-avatar = { path = "avatar" }
+omega-transcendence = { path = "transcendence", optional = true }
 tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -22,10 +23,13 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 dotenvy = "0.15"
 async-trait = "0.1"
+ctrlc = "3.4"
+parking_lot = "0.12"
+chrono = "0.4"
 
 [workspace]
-members = ["hypercore", "runtime", "engineering", "evolution", "adapters", "agent", "research", "life_harness", "superpowers", "avatar"]
+members = ["hypercore", "runtime", "engineering", "evolution", "adapters", "agent", "research", "life_harness", "superpowers", "avatar", "transcendence"]
 
 [features]
 default = ["full"]
-full = []
+full = ["omega-transcendence"]

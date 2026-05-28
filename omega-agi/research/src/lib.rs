@@ -20,11 +20,11 @@ pub mod searcher;
 pub mod extractor;
 pub mod reporter;
 
-mod knowledge;
+pub mod knowledge;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
-use searcher::Searcher;
+use searcher::{FetchedContent, Searcher};
 use extractor::Extractor;
 use reporter::{Reporter, ReportFormat, Report};
 use knowledge::KnowledgeGraph;
@@ -92,7 +92,7 @@ pub struct ResearchResult {
 impl ResearchResult {
     pub fn failed(topic: &str, error: &str) -> Self {
         Self {
-            id: uuid_v4(),
+            id: uuid::Uuid::new_v4().to_string(),
             topic: topic.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             sources_found: 0,
@@ -113,7 +113,7 @@ pub struct Researcher {
     searcher: Searcher,
     extractor: Extractor,
     reporter: Reporter,
-    knowledge: KnowledgeGraph,
+    knowledge: Mutex<KnowledgeGraph>,
     history: Arc<RwLock<Vec<ResearchResult>>>,
 }
 
@@ -129,7 +129,7 @@ impl Researcher {
             searcher: Searcher::new(config.search_depth),
             extractor: Extractor::new(config.min_relevance),
             reporter: Reporter::new(config.report_format.clone()),
-            knowledge: KnowledgeGraph::new(config.enable_knowledge_graph),
+            knowledge: Mutex::new(KnowledgeGraph::new(config.enable_knowledge_graph)),
             history: Arc::new(RwLock::new(Vec::new())),
             config,
         }
@@ -145,28 +145,39 @@ impl Researcher {
             return ResearchResult::failed(topic, "No sources found");
         }
 
+        // Convert sources to FetchedContent for downstream consumers
+        let fetched: Vec<FetchedContent> = sources
+            .iter()
+            .map(|s| FetchedContent {
+                url: s.url.clone(),
+                title: s.title.clone(),
+                content: s.snippet.clone(),
+                word_count: s.snippet.split_whitespace().count(),
+            })
+            .collect();
+
         // Step 2: Extract content & summarize
-        let extraction = self.extractor.extract(topic, &sources).await;
+        let extraction = self.extractor.extract(topic, &fetched).await;
 
         // Step 3: Update knowledge graph
         if self.config.enable_knowledge_graph {
-            self.knowledge.ingest(topic, &sources, &extraction.key_points);
+            self.knowledge.lock().unwrap().ingest(topic, &fetched, &extraction.key_points);
         }
 
         // Step 4: Generate report
         let report = if self.config.auto_report {
-            Some(self.reporter.generate(topic, &extraction, &sources))
+            Some(self.reporter.generate(topic, &extraction, &fetched))
         } else {
             None
         };
 
         let result = ResearchResult {
-            id: uuid_v4(),
+            id: uuid::Uuid::new_v4().to_string(),
             topic: topic.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             sources_found: sources.len(),
             summary: extraction.summary,
-            key_points: extraction.key_points,
+            key_points: extraction.key_points.clone(),
             sources: sources.iter().map(|s| s.url.clone()).collect(),
             tags: extract_tags(topic, &extraction.key_points),
             relevance_score: extraction.relevance,
@@ -204,7 +215,7 @@ impl Researcher {
 
     /// Get knowledge graph insights
     pub fn get_knowledge_insights(&self) -> Vec<String> {
-        self.knowledge.get_insights()
+        self.knowledge.lock().unwrap().get_insights()
     }
 
     /// Version string
@@ -219,18 +230,7 @@ impl Default for Researcher {
     }
 }
 
-fn uuid_v4() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
-    format!(
-        "{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
-        t.as_secs(),
-        (t.as_nanos() >> 48) as u16,
-        (t.as_nanos() >> 32) as u16 & 0x0fff,
-        (t.as_nanos() >> 16) as u16 & 0x3fff | 0x8000,
-        t.as_nanos()
-    )
-}
+
 
 fn extract_tags(topic: &str, key_points: &[String]) -> Vec<String> {
     let mut tags: Vec<String> = topic
