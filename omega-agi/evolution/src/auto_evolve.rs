@@ -37,6 +37,8 @@ pub struct AutoEvolveConfig {
     pub git_remote: String,
     /// Git 分支名模板（{iteration} 会被替换为迭代号）
     pub branch_template: String,
+    /// 默认分支名（切换回的分支，默认 master）
+    pub default_branch: String,
 }
 
 impl Default for AutoEvolveConfig {
@@ -49,6 +51,7 @@ impl Default for AutoEvolveConfig {
             workspace_root: ".".into(),
             git_remote: "origin".into(),
             branch_template: "auto-evolve/iteration-{iteration}".into(),
+            default_branch: "master".into(),
         }
     }
 }
@@ -386,7 +389,7 @@ impl EvolvedConfig {{
     // ── 自动修复 ──────────────────────────────────────────────────────────
 
     /// 分析测试失败并尝试自动修复
-    fn auto_fix(&self, evolution: &EvolutionResult, test_output: &str) -> (bool, String, u32) {
+    fn auto_fix(&self, _evolution: &EvolutionResult, test_output: &str) -> (bool, String, u32) {
         let mut output = test_output.to_string();
         let mut attempts = 0u32;
 
@@ -433,28 +436,56 @@ impl EvolvedConfig {{
     fn parse_errors(&self, test_output: &str) -> Vec<(String, String)> {
         let mut fixes = Vec::new();
 
-        // 解析 Rust 编译错误模式: error[E...]: ... --> file:line:col
-        for line in test_output.lines() {
-            // 匹配 "error[E" 开头的行
-            if line.contains("error[E") && line.contains("-->") {
-                // 找到文件路径
-                if let Some(file_info) = line.split("-->").nth(1) {
-                    let file_path = file_info.trim().split(':').next().unwrap_or("").trim();
-                    if !file_path.is_empty() && Path::new(file_path).exists() {
-                        // 读取文件内容，尝试修复常见的 missing semicolon / unused import 等
-                        if let Ok(content) = std::fs::read_to_string(file_path) {
-                            // 简单修复：去掉多余的注释行、修正缩进等
-                            let mut fixed = content.clone();
-                            let original = content.clone();
+        // 解析 Rust 编译错误: error[E...] 和普通 error
+        let mut current_file: Option<String> = None;
+        let mut current_errors: Vec<String> = Vec::new();
 
-                            // 如果内容有变化才添加
-                            if fixed != original {
-                                fixes.push((file_path.to_string(), fixed));
-                            }
-                        }
+        for line in test_output.lines() {
+            // 捕获文件位置: --> path/to/file.rs:line:col
+            if line.contains("-->") && (line.contains("error") || line.contains("warning")) {
+                if let Some(file_info) = line.split("-->").nth(1) {
+                    let path_part = file_info.trim().split(':').next().unwrap_or("").trim();
+                    if !path_part.is_empty() && path_part.ends_with(".rs") {
+                        current_file = Some(path_part.to_string());
                     }
                 }
             }
+
+            // 捕获错误行本身
+            if line.contains("error[E") || line.starts_with("error:") {
+                current_errors.push(line.to_string());
+            }
+        }
+
+        // 将收集到的错误写入调试报告
+        if !current_errors.is_empty() {
+            let report_path = Path::new(&self.config.workspace_root)
+                .join("omega-agi")
+                .join("config")
+                .join("compile_errors.log");
+
+            let report = format!(
+                "Auto-Evolve Fix Report — Iteration #{}\n\
+                 ========================================\n\
+                 Errors found: {}\n\
+                 First file: {}\n\n\
+                 Errors:\n{}\n",
+                self.iteration,
+                current_errors.len(),
+                current_file.as_deref().unwrap_or("unknown"),
+                current_errors.join("\n"),
+            );
+
+            if let Some(parent) = report_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&report_path, &report);
+
+            tracing::warn!(
+                "[AutoEvolve] {} compile error(s) detected, report written to {:?}",
+                current_errors.len(),
+                report_path
+            );
         }
 
         fixes
@@ -543,7 +574,7 @@ impl EvolvedConfig {{
 
         // 切回主分支
         Command::new("git")
-            .args(["checkout", "master"])
+            .args(["checkout", &self.config.default_branch])
             .current_dir(git_root)
             .output()?;
 
