@@ -1287,11 +1287,9 @@ mod tests {
     #[test]
     fn test_circuit_breaker_blocks_when_open() {
         let mut ctrl = SelfHealingController::with_settings(1, 60, 100, 1000, 2);
-        // First failure trips the breaker
-        let r1 = ctrl.diagnose_and_heal("svc", "nonexistent");
-        // The circuit breaker trips after failure_threshold failures
-        // Since threshold is 1 and diagnose_and_heal records failure,
-        // the next call should be blocked
+        // Trip the breaker directly (threshold=1, one failure opens it)
+        ctrl.circuit_breaker_mut().record_failure();
+        // Now the breaker is Open — diagnose_and_heal should be blocked
         let r2 = ctrl.diagnose_and_heal("svc", "whatever");
         assert!(
             !r2.success || r2.message.contains("Circuit breaker") || r2.message.contains("OPEN")
