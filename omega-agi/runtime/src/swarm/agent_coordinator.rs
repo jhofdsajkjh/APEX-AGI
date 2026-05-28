@@ -1,11 +1,11 @@
 //! Swarm Agent Coordinator
 //! Coordinates multiple AI agents working together on tasks.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 /// Handle representing an agent in the swarm.
 #[derive(Debug, Clone, Serialize, Deserialize)]

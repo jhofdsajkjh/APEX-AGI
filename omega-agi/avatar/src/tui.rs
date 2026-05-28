@@ -23,7 +23,11 @@ impl TuiSession {
         chat: Arc<RwLock<ChatEngine>>,
         config: Arc<RwLock<AvatarConfig>>,
     ) -> Self {
-        Self { character, chat, config }
+        Self {
+            character,
+            chat,
+            config,
+        }
     }
 
     /// Run the interactive TUI session
@@ -34,11 +38,18 @@ impl TuiSession {
         println!("║        🎭 OMEGA AGI AVATAR INTERFACE          ║");
         println!("╚══════════════════════════════════════════════╝");
         println!();
-        println!("{}  {} — {}  \x1b[0m", character.color(), character.name(), character.title());
+        println!(
+            "{}  {} — {}  \x1b[0m",
+            character.color(),
+            character.name(),
+            character.title()
+        );
         println!("  >>> {}", character.tagline());
         println!();
         println!("  Commands:");
-        println!("    /switch <character>  — Change avatar (sage/engineer/companion/maverick/guardian)");
+        println!(
+            "    /switch <character>  — Change avatar (sage/engineer/companion/maverick/guardian)"
+        );
         println!("    /mood <mood>         — Set avatar mood");
         println!("    /history             — Show conversation history");
         println!("    /info                — Show character info");
@@ -77,8 +88,16 @@ impl TuiSession {
                 "/history" => {
                     let history = self.chat.read().await;
                     for msg in history.history().iter().rev().take(10).rev() {
-                        println!("[{}] {}: {}", msg.timestamp[..19].to_string(), msg.role, 
-                            if msg.content.len() > 80 { format!("{}...", &msg.content[..77]) } else { msg.content.clone() });
+                        println!(
+                            "[{}] {}: {}",
+                            msg.timestamp[..19].to_string(),
+                            msg.role,
+                            if msg.content.len() > 80 {
+                                format!("{}...", &msg.content[..77])
+                            } else {
+                                msg.content.clone()
+                            }
+                        );
                     }
                     continue;
                 }
@@ -133,6 +152,10 @@ impl TuiSession {
             let mut chat = self.chat.write().await;
             chat.reset(&name);
         }
-        println!("Switched to avatar: {} — {}", name, self.character.read().await.title());
+        println!(
+            "Switched to avatar: {} — {}",
+            name,
+            self.character.read().await.title()
+        );
     }
 }

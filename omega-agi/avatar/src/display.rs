@@ -65,7 +65,11 @@ impl DisplayRenderer {
 
     /// Render a separator line
     pub fn separator() {
-        println!("{}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈{}", Colors::DIM, Colors::RESET);
+        println!(
+            "{}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈{}",
+            Colors::DIM,
+            Colors::RESET
+        );
     }
 
     /// Format a header box

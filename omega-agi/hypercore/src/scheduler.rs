@@ -85,14 +85,12 @@ impl Ord for TaskEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Higher priority first; if equal, earlier deadline first
         match other.priority.cmp(&self.priority) {
-            std::cmp::Ordering::Equal => {
-                match (self.deadline, other.deadline) {
-                    (Some(a), Some(b)) => a.cmp(&b),
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => std::cmp::Ordering::Equal,
-                }
-            }
+            std::cmp::Ordering::Equal => match (self.deadline, other.deadline) {
+                (Some(a), Some(b)) => a.cmp(&b),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            },
             ord => ord,
         }
     }
@@ -183,7 +181,8 @@ impl TaskScheduler {
                     let mut s = stats.write();
                     s.completed += 1;
                     s.running = s.running.saturating_sub(1);
-                    s.avg_latency_us = (s.avg_latency_us * (s.completed - 1) + elapsed_us) / s.completed;
+                    s.avg_latency_us =
+                        (s.avg_latency_us * (s.completed - 1) + elapsed_us) / s.completed;
                     debug!(task_id = %id, elapsed_us, "Task completed");
                 }
                 Err(e) => {
@@ -241,9 +240,7 @@ impl TaskScheduler {
             let deadline_exceeded = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let deadline_flag = deadline_exceeded.clone();
 
-            let task_handle = tokio::spawn(async move {
-                task(id).await
-            });
+            let task_handle = tokio::spawn(async move { task(id).await });
 
             tokio::select! {
                 result = task_handle => {
@@ -359,9 +356,7 @@ mod tests {
     #[tokio::test]
     async fn test_spawn_and_complete() {
         let scheduler = TaskScheduler::new();
-        let id = scheduler.spawn(TaskPriority::Normal, |_id| async move {
-            Ok(())
-        });
+        let id = scheduler.spawn(TaskPriority::Normal, |_id| async move { Ok(()) });
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -413,7 +408,10 @@ mod tests {
 
         // Cancel should succeed regardless of pending/running state
         let cancelled = scheduler.cancel(id);
-        assert!(cancelled, "Cancel should succeed for pending or running task");
+        assert!(
+            cancelled,
+            "Cancel should succeed for pending or running task"
+        );
 
         let stats = scheduler.stats();
         assert!(stats.cancelled >= 1, "At least one cancellation recorded");

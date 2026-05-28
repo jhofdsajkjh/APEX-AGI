@@ -21,24 +21,24 @@
 //! └── Orchestrator    (multi-agent coordination)
 //! ```
 
-pub mod inference;
 pub mod engines;
-pub mod memory;
-pub mod knowledge;
-pub mod tool;
 pub mod feedback;
+pub mod inference;
+pub mod knowledge;
+pub mod memory;
 pub mod orchestrator;
+pub mod tool;
 
 // Re-export old modules for backward compatibility
 pub mod llm;
 pub mod react;
 pub mod tools;
 
-use inference::InferenceEngine;
-use tool::ToolRegistry;
-use memory::{LongTermMemory, MemoryConfig, MemoryType};
 use feedback::{FeedbackCollector, FeedbackIntegrator};
+use inference::InferenceEngine;
+use memory::{LongTermMemory, MemoryConfig, MemoryType};
 use std::sync::Arc;
+use tool::ToolRegistry;
 
 /// The top-level Agent — combines an LLM engine with ReAct reasoning,
 /// tools, memory, knowledge, and feedback.
@@ -82,13 +82,16 @@ impl Agent {
 
     /// Create from environment (backward-compatible).
     pub fn from_env(tools: ToolRegistry) -> Self {
-        let engine: Arc<dyn InferenceEngine> = if std::env::var("OMEGA_API_KEY").ok()
+        let engine: Arc<dyn InferenceEngine> = if std::env::var("OMEGA_API_KEY")
+            .ok()
             .and_then(|k| if k.is_empty() { None } else { Some(k) })
             .is_some()
         {
             Arc::new(engines::OpenAIEngine::from_env())
         } else {
-            tracing::warn!("OMEGA_API_KEY not set — using MockEngine. Set in .env for real LLM access.");
+            tracing::warn!(
+                "OMEGA_API_KEY not set — using MockEngine. Set in .env for real LLM access."
+            );
             Arc::new(engines::MockEngine::new())
         };
 
@@ -135,19 +138,21 @@ impl Agent {
             if let Some(answer) = self.parse_answer(&content) {
                 tracing::info!(agent = %self.name, step, "Task completed");
                 // Store successful procedure in memory
-                self.memory.store_tagged(
-                    format!("Task completed: {}\nResult: {}", task, answer),
-                    MemoryType::Procedural,
-                    0.8,
-                    vec!["success".into(), self.name.clone()],
-                ).await;
+                self.memory
+                    .store_tagged(
+                        format!("Task completed: {}\nResult: {}", task, answer),
+                        MemoryType::Procedural,
+                        0.8,
+                        vec!["success".into(), self.name.clone()],
+                    )
+                    .await;
                 return Ok(answer);
             }
 
             // Try Action
             if let Some((action, args_json)) = self.parse_action(&content) {
-                let args: serde_json::Value =
-                    serde_json::from_str(&args_json).unwrap_or(serde_json::Value::Object(Default::default()));
+                let args: serde_json::Value = serde_json::from_str(&args_json)
+                    .unwrap_or(serde_json::Value::Object(Default::default()));
 
                 tracing::debug!(step, action = %action, args = %args_json, "Executing tool");
 
@@ -155,19 +160,29 @@ impl Agent {
                 let obs = if result.success {
                     format!("Observation:\n{}", self.truncate(&result.output, 4000))
                 } else {
-                    format!("Observation (error):\n{}", self.truncate(&result.output, 2000))
+                    format!(
+                        "Observation (error):\n{}",
+                        self.truncate(&result.output, 2000)
+                    )
                 };
 
                 tracing::debug!(step, tool_success = result.success, "Tool result");
                 messages.push(inference::Message::user(&obs));
 
                 // Store in memory
-                self.memory.store_tagged(
-                    format!("Step {}: Action {} → {}", step, action, if result.success { "success" } else { "failed" }),
-                    MemoryType::Episodic,
-                    0.4,
-                    vec![action, self.name.clone()],
-                ).await;
+                self.memory
+                    .store_tagged(
+                        format!(
+                            "Step {}: Action {} → {}",
+                            step,
+                            action,
+                            if result.success { "success" } else { "failed" }
+                        ),
+                        MemoryType::Episodic,
+                        0.4,
+                        vec![action, self.name.clone()],
+                    )
+                    .await;
             } else {
                 // Parse failure — help the LLM reformat
                 messages.push(inference::Message::user(
@@ -183,11 +198,14 @@ impl Agent {
         // Max steps reached — force a final answer
         messages.push(inference::Message::user(
             "You have reached the maximum number of reasoning steps. \
-             Please provide your final answer now based on what you've learned so far."
+             Please provide your final answer now based on what you've learned so far.",
         ));
         let final_resp = self.engine.chat(&messages).await?;
         Ok(self.parse_answer(&final_resp.content).unwrap_or_else(|| {
-            format!("Maximum steps reached ({}). Last response:\n{}", self.max_steps, final_resp.content)
+            format!(
+                "Maximum steps reached ({}). Last response:\n{}",
+                self.max_steps, final_resp.content
+            )
         }))
     }
 
@@ -238,7 +256,10 @@ Important rules:
         if let Some(start) = text.find("**Answer**") {
             let after = &text[start + "**Answer**".len()..];
             let after = after.trim_start_matches(':').trim();
-            let end = after.find("\n**").or_else(|| after.find("\n\n")).unwrap_or(after.len());
+            let end = after
+                .find("\n**")
+                .or_else(|| after.find("\n\n"))
+                .unwrap_or(after.len());
             let candidate = after[..end].trim();
             if !candidate.is_empty() {
                 return Some(candidate.to_string());
@@ -247,7 +268,10 @@ Important rules:
         if let Some(start) = text.find("**answer**") {
             let after = &text[start + "**answer**".len()..];
             let after = after.trim_start_matches(':').trim();
-            let end = after.find("\n**").or_else(|| after.find("\n\n")).unwrap_or(after.len());
+            let end = after
+                .find("\n**")
+                .or_else(|| after.find("\n\n"))
+                .unwrap_or(after.len());
             let candidate = after[..end].trim();
             if !candidate.is_empty() {
                 return Some(candidate.to_string());
@@ -277,7 +301,10 @@ Important rules:
         if let Some(last) = paragraphs.last() {
             // Only use last paragraph if it looks like an answer (not an action or thought)
             let lower = last.to_lowercase();
-            if !lower.starts_with("thought:") && !lower.starts_with("action:") && !lower.starts_with("tool:") {
+            if !lower.starts_with("thought:")
+                && !lower.starts_with("action:")
+                && !lower.starts_with("tool:")
+            {
                 return Some(last.to_string());
             }
         }
@@ -321,7 +348,12 @@ Important rules:
             let after_input = &remaining_after_action[input_idx + "Action Input:".len()..];
 
             // Try same-line JSON first: trim and check if it starts with '{' or '['
-            let first_line = after_input.lines().next().unwrap_or("{}").trim().to_string();
+            let first_line = after_input
+                .lines()
+                .next()
+                .unwrap_or("{}")
+                .trim()
+                .to_string();
             if first_line.starts_with('{') || first_line.starts_with('[') {
                 // Same-line JSON — collect until the closing brace/bracket or next section
                 let mut depth: i32 = 0;
@@ -329,9 +361,23 @@ Important rules:
                 let mut started = false;
                 for ch in first_line.chars() {
                     match ch {
-                        '{' | '[' => { depth += 1; started = true; json_buf.push(ch); },
-                        '}' | ']' => { depth -= 1; json_buf.push(ch); if started && depth <= 0 { break; } },
-                        _ => if started { json_buf.push(ch); },
+                        '{' | '[' => {
+                            depth += 1;
+                            started = true;
+                            json_buf.push(ch);
+                        }
+                        '}' | ']' => {
+                            depth -= 1;
+                            json_buf.push(ch);
+                            if started && depth <= 0 {
+                                break;
+                            }
+                        }
+                        _ => {
+                            if started {
+                                json_buf.push(ch);
+                            }
+                        }
                     }
                 }
                 if !json_buf.is_empty() && depth <= 0 {
@@ -349,19 +395,24 @@ Important rules:
                     match ch {
                         '{' | '[' => depth += 1,
                         '}' | ']' => depth -= 1,
-                        _ => {},
+                        _ => {}
                     }
                 }
                 for line in lines {
                     let trimmed = line.trim();
-                    if trimmed.is_empty() || trimmed.starts_with("Thought:") || trimmed.starts_with("Action:") || trimmed.starts_with("Tool:") || trimmed.starts_with("Answer:") {
+                    if trimmed.is_empty()
+                        || trimmed.starts_with("Thought:")
+                        || trimmed.starts_with("Action:")
+                        || trimmed.starts_with("Tool:")
+                        || trimmed.starts_with("Answer:")
+                    {
                         break;
                     }
                     for ch in trimmed.chars() {
                         match ch {
                             '{' | '[' => depth += 1,
                             '}' | ']' => depth -= 1,
-                            _ => {},
+                            _ => {}
                         }
                     }
                     json_buf.push_str(trimmed);

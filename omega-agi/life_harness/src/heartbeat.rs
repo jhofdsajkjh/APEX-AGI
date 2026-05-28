@@ -77,7 +77,11 @@ impl HeartbeatMonitor {
         let total = *self.total.read().await;
 
         HeartbeatStatus {
-            last_ping: if last.is_empty() { "never".into() } else { last },
+            last_ping: if last.is_empty() {
+                "never".into()
+            } else {
+                last
+            },
             consecutive_successes: successes,
             failures,
             total_pings: total,

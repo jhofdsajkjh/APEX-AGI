@@ -26,7 +26,10 @@ pub struct ChatEngine {
 impl ChatEngine {
     pub fn new(character_name: &str, max_history: usize, system_prefix: &str) -> Self {
         let system_prompt = if system_prefix.is_empty() {
-            format!("You are {}, an AI avatar. Respond naturally and conversationally.", character_name)
+            format!(
+                "You are {}, an AI avatar. Respond naturally and conversationally.",
+                character_name
+            )
         } else {
             format!("{}\nYou are {}.", system_prefix, character_name)
         };
@@ -96,7 +99,11 @@ impl ChatEngine {
     /// Get context window (last N messages)
     pub fn context(&self, n: usize) -> Vec<ChatMessage> {
         let history = self.history.blocking_read();
-        let start = if history.len() > n { history.len() - n } else { 0 };
+        let start = if history.len() > n {
+            history.len() - n
+        } else {
+            0
+        };
         history[start..].to_vec()
     }
 }

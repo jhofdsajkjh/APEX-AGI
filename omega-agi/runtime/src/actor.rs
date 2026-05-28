@@ -63,8 +63,7 @@ impl Message {
 
     /// Deserialize the payload into a typed value.
     pub fn decode<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
-        serde_json::from_slice(&self.payload)
-            .context("Failed to deserialize message payload")
+        serde_json::from_slice(&self.payload).context("Failed to deserialize message payload")
     }
 
     /// Create a message with a typed payload.
@@ -403,7 +402,9 @@ mod tests {
     async fn test_send_message() {
         let system = ActorSystem::new();
         let collected = Arc::new(RwLock::new(Vec::new()));
-        let ref_ = system.spawn(CollectorActor::new(collected.clone())).unwrap();
+        let ref_ = system
+            .spawn(CollectorActor::new(collected.clone()))
+            .unwrap();
 
         let msg = Message::new(ref_.id(), ref_.id(), "test", b"data".to_vec());
         ref_.send(msg).unwrap();

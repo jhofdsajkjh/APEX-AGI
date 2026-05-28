@@ -45,7 +45,10 @@ impl PRError {
         } else if status_code == 409 {
             PRError::MergeConflict
         } else {
-            PRError::HttpError { code: status_code, message: body.to_string() }
+            PRError::HttpError {
+                code: status_code,
+                message: body.to_string(),
+            }
         }
     }
 }
@@ -65,7 +68,11 @@ pub struct PRManager {
 impl PRManager {
     /// Create a new manager for the given repository.
     pub fn new(github_token: String, owner: String, repo: String) -> Self {
-        Self { github_token, owner, repo }
+        Self {
+            github_token,
+            owner,
+            repo,
+        }
     }
 
     fn api_url(&self, endpoint: &str) -> String {
@@ -78,10 +85,18 @@ impl PRManager {
     fn curl(&self, method: &str, url: &str, body: Option<&str>) -> Result<(String, u16), PRError> {
         let auth = format!("Authorization: Bearer {}", self.github_token);
         let mut args = vec![
-            "-s", "-L", "-w", "%{http_code}", "-X", method,
-            "-H", &auth,
-            "-H", "Accept: application/vnd.github+json",
-            "-H", "X-GitHub-Api-Version: 2022-11-28",
+            "-s",
+            "-L",
+            "-w",
+            "%{http_code}",
+            "-X",
+            method,
+            "-H",
+            &auth,
+            "-H",
+            "Accept: application/vnd.github+json",
+            "-H",
+            "X-GitHub-Api-Version: 2022-11-28",
         ];
 
         if let Some(b) = body {
@@ -147,12 +162,21 @@ impl PRManager {
             "head": head,
             "base": base
         });
-        let json: serde_json::Value = self.curl_json("POST", &url, Some(&serde_json::to_string(&payload).unwrap()))?;
+        let json: serde_json::Value = self.curl_json(
+            "POST",
+            &url,
+            Some(&serde_json::to_string(&payload).unwrap()),
+        )?;
         self.parse_pr_state(&json)
     }
 
     /// Update an existing pull request's title and/or body.
-    pub fn update_pr(&self, pr_number: u64, title: Option<&str>, body: Option<&str>) -> Result<PRState, PRError> {
+    pub fn update_pr(
+        &self,
+        pr_number: u64,
+        title: Option<&str>,
+        body: Option<&str>,
+    ) -> Result<PRState, PRError> {
         let mut payload = serde_json::Map::new();
         if let Some(t) = title {
             payload.insert("title".into(), serde_json::json!(t));
@@ -161,7 +185,11 @@ impl PRManager {
             payload.insert("body".into(), serde_json::json!(b));
         }
         let url = self.api_url(&format!("pulls/{pr_number}"));
-        let json: serde_json::Value = self.curl_json("PATCH", &url, Some(&serde_json::to_string(&payload).unwrap()))?;
+        let json: serde_json::Value = self.curl_json(
+            "PATCH",
+            &url,
+            Some(&serde_json::to_string(&payload).unwrap()),
+        )?;
         self.parse_pr_state(&json)
     }
 
@@ -169,7 +197,8 @@ impl PRManager {
     pub fn merge_pr(&self, pr_number: u64) -> Result<(), PRError> {
         let url = self.api_url(&format!("pulls/{pr_number}/merge"));
         let payload = serde_json::json!({ "merge_method": "squash" });
-        let (raw, code) = self.curl("PUT", &url, Some(&serde_json::to_string(&payload).unwrap()))?;
+        let (raw, code) =
+            self.curl("PUT", &url, Some(&serde_json::to_string(&payload).unwrap()))?;
         if code == 200 || code == 201 || raw.contains("\"merged\":true") {
             Ok(())
         } else if raw.contains("conflict") || raw.contains("Merge conflict") {
@@ -185,7 +214,11 @@ impl PRManager {
     pub fn add_labels(&self, pr_number: u64, labels: &[&str]) -> Result<(), PRError> {
         let url = self.api_url(&format!("issues/{pr_number}/labels"));
         let payload = serde_json::json!({ "labels": labels });
-        let _resp: serde_json::Value = self.curl_json("POST", &url, Some(&serde_json::to_string(&payload).unwrap()))?;
+        let _resp: serde_json::Value = self.curl_json(
+            "POST",
+            &url,
+            Some(&serde_json::to_string(&payload).unwrap()),
+        )?;
         Ok(())
     }
 
@@ -222,7 +255,11 @@ impl PRManager {
     pub fn close_pr(&self, pr_number: u64) -> Result<PRState, PRError> {
         let url = self.api_url(&format!("pulls/{pr_number}"));
         let payload = serde_json::json!({ "state": "closed" });
-        let json: serde_json::Value = self.curl_json("PATCH", &url, Some(&serde_json::to_string(&payload).unwrap()))?;
+        let json: serde_json::Value = self.curl_json(
+            "PATCH",
+            &url,
+            Some(&serde_json::to_string(&payload).unwrap()),
+        )?;
         self.parse_pr_state(&json)
     }
 
@@ -273,11 +310,18 @@ impl PRManager {
     }
 
     /// Poll until all checks are green (status == "success") or timeout is reached.
-    pub fn wait_for_checks(&self, pr_number: u64, timeout_secs: u64) -> Result<Vec<CheckRun>, PRError> {
+    pub fn wait_for_checks(
+        &self,
+        pr_number: u64,
+        timeout_secs: u64,
+    ) -> Result<Vec<CheckRun>, PRError> {
         let start = std::time::Instant::now();
         loop {
             let checks = self.get_check_runs(pr_number)?;
-            if checks.iter().all(|c| c.status == "success" || c.status == "completed") {
+            if checks
+                .iter()
+                .all(|c| c.status == "success" || c.status == "completed")
+            {
                 return Ok(checks);
             }
             if start.elapsed().as_secs() >= timeout_secs {
@@ -296,7 +340,10 @@ impl PRManager {
     pub fn auto_merge(&self, pr_number: u64) -> Result<(), PRError> {
         // Check reviews
         let reviews = self.get_pr_reviews(pr_number)?;
-        let approved = reviews.iter().filter(|r| r.state == ReviewState::Approved).count();
+        let approved = reviews
+            .iter()
+            .filter(|r| r.state == ReviewState::Approved)
+            .count();
 
         if approved < 2 {
             return Err(PRError::MergeBlocked);

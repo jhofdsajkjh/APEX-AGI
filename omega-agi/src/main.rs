@@ -1,19 +1,18 @@
+use anyhow::Context;
 use omega_agi::{
-    OmegaAGI, Config,
-    agent::tool::ToolRegistry,
     agent::inference,
+    agent::tool::ToolRegistry,
     agent::Agent,
-    evolution::{self, Evolution, SelfEvolver, EvolverConfig, AutoEvolve, AutoEvolveConfig},
-    evolution::apex_core::{compute_apex, ApexInput, format_apex_state},
-    research::ResearchResult,
-    life_harness::LifeHarness,
-    superpowers::Superpowers,
     avatar::AvatarEngine,
+    evolution::apex_core::{compute_apex, format_apex_state, ApexInput},
+    evolution::{self, AutoEvolve, AutoEvolveConfig, Evolution, EvolverConfig, SelfEvolver},
+    life_harness::LifeHarness,
+    research::ResearchResult,
+    superpowers::Superpowers,
     transcendence::TranscendenceEngine,
-    CrossLayerEvent,
+    Config, CrossLayerEvent, OmegaAGI,
 };
 use std::sync::Arc;
-use anyhow::Context;
 
 /// Build tool registry with system capabilities
 fn build_tools(omega: &OmegaAGI) -> ToolRegistry {
@@ -32,7 +31,8 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Shutdown signal received — initiating graceful shutdown...");
         event_bus.publish(CrossLayerEvent::ShutdownRequested);
         let _ = shutdown_tx.send(());
-    }).expect("Failed to set Ctrl-C handler");
+    })
+    .expect("Failed to set Ctrl-C handler");
 
     // Run initial health check
     println!("🧬 OMEGA AGI Supremacy v{}", omega.version());
@@ -61,17 +61,29 @@ async fn run_command(omega: &OmegaAGI, cmd: &str, args: &[String]) -> anyhow::Re
     match cmd {
         "run" => cmd_run(omega, args.get(1).cloned().unwrap_or_default()).await?,
         "evolve" => cmd_evolve(omega).await?,
-        "interactive"|"chat" => cmd_interactive(omega).await?,
-        "check"|"health" => cmd_check(omega).await?,
+        "interactive" | "chat" => cmd_interactive(omega).await?,
+        "check" | "health" => cmd_check(omega).await?,
         "apex" | "apex-evolve" => cmd_apex(omega, args.get(1).map(|s| s.as_str())).await?,
         // Layer 6-10 commands
-        "research" | "rs" => cmd_research(
-            omega,
-            &args.get(1).cloned().unwrap_or_default(),
-            args.get(2).map(|s| s.as_str()),
-        ).await?,
-        "life" | "lh" | "harness" => cmd_life_harness(omega, args.get(1).map(|s| s.as_str())).await?,
-        "superpowers" | "sp" | "boost" => cmd_superpowers(omega, args.get(1).map(|s| s.as_str()), args.get(2).map(|s| s.as_str())).await?,
+        "research" | "rs" => {
+            cmd_research(
+                omega,
+                &args.get(1).cloned().unwrap_or_default(),
+                args.get(2).map(|s| s.as_str()),
+            )
+            .await?
+        }
+        "life" | "lh" | "harness" => {
+            cmd_life_harness(omega, args.get(1).map(|s| s.as_str())).await?
+        }
+        "superpowers" | "sp" | "boost" => {
+            cmd_superpowers(
+                omega,
+                args.get(1).map(|s| s.as_str()),
+                args.get(2).map(|s| s.as_str()),
+            )
+            .await?
+        }
         "avatar" | "av" | "character" => cmd_avatar(omega, &args[1..]).await?,
         "transcend" | "tc" | "transcendence" => cmd_transcendence(omega).await?,
         "adapters" | "ad" => cmd_adapters(omega, args.get(1).map(|s| s.as_str())).await?,
@@ -109,7 +121,10 @@ async fn cmd_evolve(omega: &OmegaAGI) -> anyhow::Result<()> {
     let mut auto_evolve = AutoEvolve::new(AutoEvolveConfig::default());
 
     let iterations: u64 = 5;
-    tracing::info!("🧬 Running Φ_APEX*∞ self-evolution for {} iterations", iterations);
+    tracing::info!(
+        "🧬 Running Φ_APEX*∞ self-evolution for {} iterations",
+        iterations
+    );
 
     // Use real compile check for evolution feedback via Engineering
     let eng = &omega.engineering;
@@ -146,16 +161,24 @@ async fn cmd_evolve(omega: &OmegaAGI) -> anyhow::Result<()> {
             i + 1,
             result.evolution.final_score,
             compile_score,
-            if result.all_passed { "✅ PASS" } else { "❌ FAIL" },
+            if result.all_passed {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            },
             result.fix_attempts,
             result.generated_files.len(),
         );
 
-        omega.update_layer_health("evolution", result.evolution.final_score.min(1.0)).await;
-        omega.event_bus.publish(CrossLayerEvent::EvolutionCompleted {
-            iteration: i + 1,
-            fitness: result.evolution.final_score,
-        });
+        omega
+            .update_layer_health("evolution", result.evolution.final_score.min(1.0))
+            .await;
+        omega
+            .event_bus
+            .publish(CrossLayerEvent::EvolutionCompleted {
+                iteration: i + 1,
+                fitness: result.evolution.final_score,
+            });
 
         if !result.all_passed {
             if let Some(ref err) = result.error {
@@ -177,8 +200,7 @@ async fn cmd_evolve(omega: &OmegaAGI) -> anyhow::Result<()> {
          │ num_layers    = {}                            \n\
          │ hidden_dim    = {}                            \n\
          └──────────────────────────────────────────────┘",
-        best.learning_rate, best.batch_size, best.temperature,
-        best.num_layers, best.hidden_dim,
+        best.learning_rate, best.batch_size, best.temperature, best.num_layers, best.hidden_dim,
     );
 
     // Final APEX state
@@ -222,7 +244,8 @@ async fn cmd_apex(omega: &OmegaAGI, flag: Option<&str>) -> anyhow::Result<()> {
 
     tracing::info!(
         "🚀 Running Φ_APEX*∞ with population={} iterations={}",
-        pop_size, iterations
+        pop_size,
+        iterations
     );
 
     for i in 0..iterations {
@@ -253,11 +276,15 @@ async fn cmd_apex(omega: &OmegaAGI, flag: Option<&str>) -> anyhow::Result<()> {
             );
         }
 
-        omega.update_layer_health("evolution", result.evolution.final_score.min(1.0)).await;
-        omega.event_bus.publish(CrossLayerEvent::EvolutionCompleted {
-            iteration: i + 1,
-            fitness: result.evolution.final_score,
-        });
+        omega
+            .update_layer_health("evolution", result.evolution.final_score.min(1.0))
+            .await;
+        omega
+            .event_bus
+            .publish(CrossLayerEvent::EvolutionCompleted {
+                iteration: i + 1,
+                fitness: result.evolution.final_score,
+            });
     }
 
     let best = evolver.get_best_genome();
@@ -277,7 +304,9 @@ async fn cmd_apex(omega: &OmegaAGI, flag: Option<&str>) -> anyhow::Result<()> {
         evolver.iteration_count(),
         evolver.get_diversity(),
         evolver.config().population_size,
-        best.learning_rate, best.batch_size, best.temperature,
+        best.learning_rate,
+        best.batch_size,
+        best.temperature,
         best.num_layers,
     );
 
@@ -306,7 +335,9 @@ async fn cmd_interactive(omega: &OmegaAGI) -> anyhow::Result<()> {
             break;
         }
         let input = input.trim().to_string();
-        if input.is_empty() { continue; }
+        if input.is_empty() {
+            continue;
+        }
         if input == "help" {
             println!("Commands: exit, help, health, <any task>");
             continue;
@@ -365,7 +396,11 @@ async fn cmd_check(omega: &OmegaAGI) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn cmd_research(omega: &OmegaAGI, topic: &str, format_flag: Option<&str>) -> anyhow::Result<()> {
+async fn cmd_research(
+    omega: &OmegaAGI,
+    topic: &str,
+    format_flag: Option<&str>,
+) -> anyhow::Result<()> {
     if topic.is_empty() {
         println!("Usage: omega-agi research <topic> [--json]");
         println!("       omega-agi rs <topic>");
@@ -378,7 +413,9 @@ async fn cmd_research(omega: &OmegaAGI, topic: &str, format_flag: Option<&str>) 
 
     print_research_result(&result, is_json);
 
-    omega.update_layer_health("research", result.relevance_score).await;
+    omega
+        .update_layer_health("research", result.relevance_score)
+        .await;
     omega.event_bus.publish(CrossLayerEvent::ResearchCompleted {
         topic: topic.to_string(),
         sources: result.sources_found,
@@ -461,7 +498,11 @@ async fn cmd_life_harness(omega: &OmegaAGI, action: Option<&str>) -> anyhow::Res
         }
         Some("heartbeat") | Some("hb") => {
             let hb = omega.life_harness.heartbeat().await;
-            println!("💓 Heartbeat: {} failures (max: {})", hb.failures, omega.life_harness.health().await.heartbeat.failures);
+            println!(
+                "💓 Heartbeat: {} failures (max: {})",
+                hb.failures,
+                omega.life_harness.health().await.heartbeat.failures
+            );
         }
         Some("persist") | Some("save") => {
             omega.life_harness.persist().await?;
@@ -469,23 +510,36 @@ async fn cmd_life_harness(omega: &OmegaAGI, action: Option<&str>) -> anyhow::Res
         }
         Some("restore") | Some("recover") => {
             // LifeHarness auto-restores on start, trigger recovery manually
-            let action = omega.life_harness.recover("Manual recovery requested").await;
+            let action = omega
+                .life_harness
+                .recover("Manual recovery requested")
+                .await;
             println!("🔄 Recovery action: {:?}", action);
         }
         Some(other) => {
-            println!("Unknown action: {}. Use: status, health, resources, heartbeat, persist, recover", other);
+            println!(
+                "Unknown action: {}. Use: status, health, resources, heartbeat, persist, recover",
+                other
+            );
         }
     }
     Ok(())
 }
 
-async fn cmd_superpowers(omega: &OmegaAGI, action: Option<&str>, arg: Option<&str>) -> anyhow::Result<()> {
+async fn cmd_superpowers(
+    omega: &OmegaAGI,
+    action: Option<&str>,
+    arg: Option<&str>,
+) -> anyhow::Result<()> {
     match action {
         Some("status") | None => {
             let status = omega.superpowers.status().await;
             println!("⚡ Superpowers Status:");
             println!("   Boost Mode:       {:?}", status.active_boost);
-            println!("   Optimization:     {:.1}%", status.optimization_level * 100.0);
+            println!(
+                "   Optimization:     {:.1}%",
+                status.optimization_level * 100.0
+            );
             println!("   Issues Healed:    {}", status.issues_healed);
             println!("   Issues Pending:   {}", status.issues_pending);
             println!("   System Score:     {:.1}%", status.system_score * 100.0);
@@ -541,7 +595,10 @@ async fn cmd_superpowers(omega: &OmegaAGI, action: Option<&str>, arg: Option<&st
             }
         }
         Some(other) => {
-            println!("Unknown action: {}. Use: status, optimize, boost, analyze, heal", other);
+            println!(
+                "Unknown action: {}. Use: status, optimize, boost, analyze, heal",
+                other
+            );
         }
     }
     Ok(())
@@ -605,18 +662,40 @@ async fn cmd_transcendence(omega: &OmegaAGI) -> anyhow::Result<()> {
     let summary = omega.transcendence.summary().await;
 
     println!("\n┌─ Layer 10: Transcendence ───────────────────────┐");
-    println!("│  Awareness:        {:.1}%                          │", summary.awareness_level * 100.0);
-    println!("│  Phase:            {}                              │", summary.phase);
-    println!("│  Synergy:          {:.1}%                          │", summary.synergy_score * 100.0);
-    println!("│  Emergent Capabilities: {}                         │", summary.emergent_capabilities.len());
-    println!("│  Self-Goals:       {}                              │", summary.self_goals.len());
-    println!("│  Optimizations:    {}                              │", summary.total_optimizations);
+    println!(
+        "│  Awareness:        {:.1}%                          │",
+        summary.awareness_level * 100.0
+    );
+    println!(
+        "│  Phase:            {}                              │",
+        summary.phase
+    );
+    println!(
+        "│  Synergy:          {:.1}%                          │",
+        summary.synergy_score * 100.0
+    );
+    println!(
+        "│  Emergent Capabilities: {}                         │",
+        summary.emergent_capabilities.len()
+    );
+    println!(
+        "│  Self-Goals:       {}                              │",
+        summary.self_goals.len()
+    );
+    println!(
+        "│  Optimizations:    {}                              │",
+        summary.total_optimizations
+    );
     println!("├────────────────────────────────────────────────────┤");
 
     if !summary.emergent_capabilities.is_empty() {
         println!("│  ✨ Emergent Capabilities:                          │");
         for cap in &summary.emergent_capabilities {
-            println!("│    • {} (confidence: {:.1}%)", cap.name, cap.confidence * 100.0);
+            println!(
+                "│    • {} (confidence: {:.1}%)",
+                cap.name,
+                cap.confidence * 100.0
+            );
             println!("│      Layers: {}", cap.layers_involved.join(", "));
         }
     }
@@ -625,7 +704,10 @@ async fn cmd_transcendence(omega: &OmegaAGI) -> anyhow::Result<()> {
         println!("│  🎯 Self-Generated Goals:                          │");
         for goal in &summary.self_goals {
             let status = if goal.completed { "✅" } else { "🔄" };
-            println!("│    {} {} (priority: {})", status, goal.title, goal.priority);
+            println!(
+                "│    {} {} (priority: {})",
+                status, goal.title, goal.priority
+            );
         }
     }
 
@@ -637,7 +719,13 @@ async fn cmd_transcendence(omega: &OmegaAGI) -> anyhow::Result<()> {
     let mut layers: Vec<_> = meta.layer_health.into_iter().collect();
     layers.sort_by_key(|(k, _)| k.clone());
     for (layer, score) in &layers {
-        let icon = if *score >= 0.8 { "🟢" } else if *score >= 0.5 { "🟡" } else { "🔴" };
+        let icon = if *score >= 0.8 {
+            "🟢"
+        } else if *score >= 0.5 {
+            "🟡"
+        } else {
+            "🔴"
+        };
         println!("  {} {:<14} {:>5.1}%", icon, layer, score * 100.0);
     }
 
@@ -650,12 +738,19 @@ async fn cmd_adapters(omega: &OmegaAGI, action: Option<&str>) -> anyhow::Result<
             let adapters = omega.adapters.list_adapters();
             println!("📡 Available Adapters:");
             for a in &adapters {
-                let active = if omega.adapters.active_adapter == *a { " [ACTIVE]" } else { "" };
+                let active = if omega.adapters.active_adapter == *a {
+                    " [ACTIVE]"
+                } else {
+                    ""
+                };
                 println!("  • {}{}", a, active);
             }
             if let Some(info) = omega.adapters.openclaw.as_ref() {
                 let adapter_info = info.adapter_info();
-                println!("\nActive adapter info: {} v{}", adapter_info.name, adapter_info.version);
+                println!(
+                    "\nActive adapter info: {} v{}",
+                    adapter_info.name, adapter_info.version
+                );
             }
         }
         Some("set") => {

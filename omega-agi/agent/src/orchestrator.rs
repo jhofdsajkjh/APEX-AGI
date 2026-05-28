@@ -22,12 +22,12 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 
+use crate::feedback::FeedbackCollector;
 use crate::inference::{self, InferenceEngine, Message};
 use crate::memory::{LongTermMemory, MemoryConfig, MemoryType};
 use crate::tool::{ToolRegistry, ToolResult};
-use crate::feedback::FeedbackCollector;
 
 // ---------------------------------------------------------------------------
 // Agent Identity
@@ -58,8 +58,13 @@ impl AgentIdentity {
                    2. Break it down into sub-tasks\n\
                    3. Assign each sub-task to the appropriate specialist agent\n\
                    4. Review and merge results\n\
-                   5. Ensure consistency across all work".into(),
-            allowed_tools: vec!["assign_task".into(), "review_result".into(), "finalize".into()],
+                   5. Ensure consistency across all work"
+                .into(),
+            allowed_tools: vec![
+                "assign_task".into(),
+                "review_result".into(),
+                "finalize".into(),
+            ],
             model: "gpt-4o".into(),
             temperature: 0.3,
         }
@@ -73,8 +78,15 @@ impl AgentIdentity {
                    - Read existing code before modifying\n\
                    - Write thorough tests\n\
                    - Follow Rust best practices\n\
-                   - Generate documentation".into(),
-            allowed_tools: vec!["read".into(), "write".into(), "search".into(), "bash".into(), "codegen".into()],
+                   - Generate documentation"
+                .into(),
+            allowed_tools: vec![
+                "read".into(),
+                "write".into(),
+                "search".into(),
+                "bash".into(),
+                "codegen".into(),
+            ],
             model: "gpt-4o".into(),
             temperature: 0.2,
         }
@@ -88,8 +100,14 @@ impl AgentIdentity {
                    - Search through codebase\n\
                    - Analyze code patterns\n\
                    - Identify performance bottlenecks\n\
-                   - Provide detailed reports".into(),
-            allowed_tools: vec!["read".into(), "search".into(), "health".into(), "diagnose".into()],
+                   - Provide detailed reports"
+                .into(),
+            allowed_tools: vec![
+                "read".into(),
+                "search".into(),
+                "health".into(),
+                "diagnose".into(),
+            ],
             model: "gpt-4o".into(),
             temperature: 0.4,
         }
@@ -103,8 +121,14 @@ impl AgentIdentity {
                    - Run health checks\n\
                    - Execute system commands\n\
                    - Monitor system resources\n\
-                   - Handle deployments".into(),
-            allowed_tools: vec!["bash".into(), "health".into(), "diagnose".into(), "heal".into()],
+                   - Handle deployments"
+                .into(),
+            allowed_tools: vec![
+                "bash".into(),
+                "health".into(),
+                "diagnose".into(),
+                "heal".into(),
+            ],
             model: "gpt-4o".into(),
             temperature: 0.2,
         }
@@ -118,7 +142,8 @@ impl AgentIdentity {
                    - Continuously check system health\n\
                    - Detect performance regressions\n\
                    - Alert on errors\n\
-                   - Suggest proactive fixes".into(),
+                   - Suggest proactive fixes"
+                .into(),
             allowed_tools: vec!["health".into(), "diagnose".into()],
             model: "gpt-4o".into(),
             temperature: 0.1,
@@ -178,17 +203,22 @@ impl SpecialistAgent {
             messages.push(Message::assistant(&content));
 
             // Log the message
-            self.message_log.write().await.push(Message::assistant(&content));
+            self.message_log
+                .write()
+                .await
+                .push(Message::assistant(&content));
 
             // Try to parse Answer/Action
             if let Some(answer) = self.parse_answer(&content) {
                 // Store in memory
-                self.memory.store_tagged(
-                    format!("Task: {}\nResult: {}", task, answer),
-                    MemoryType::Procedural,
-                    0.7,
-                    vec![self.identity.name.clone(), "task-complete".into()],
-                ).await;
+                self.memory
+                    .store_tagged(
+                        format!("Task: {}\nResult: {}", task, answer),
+                        MemoryType::Procedural,
+                        0.7,
+                        vec![self.identity.name.clone(), "task-complete".into()],
+                    )
+                    .await;
                 return Ok(answer);
             }
 
@@ -199,12 +229,16 @@ impl SpecialistAgent {
                 {
                     messages.push(Message::user(format!(
                         "Error: You don't have permission to use '{}'. Allowed: {}",
-                        action, self.identity.allowed_tools.join(", ")
+                        action,
+                        self.identity.allowed_tools.join(", ")
                     )));
                     continue;
                 }
 
-                let result = self.tools.execute(&action, &serde_json::from_str(&args).unwrap_or_default()).await;
+                let result = self
+                    .tools
+                    .execute(&action, &serde_json::from_str(&args).unwrap_or_default())
+                    .await;
                 let obs = if result.success {
                     format!("Observation:\n{}", result.output)
                 } else {
@@ -214,26 +248,32 @@ impl SpecialistAgent {
                 messages.push(Message::user(&obs));
 
                 // Store in memory
-                self.memory.store_tagged(
-                    format!("Action: {}({}) → {}", action, args, result.output),
-                    MemoryType::Episodic,
-                    0.5,
-                    vec![self.identity.name.clone(), action],
-                ).await;
+                self.memory
+                    .store_tagged(
+                        format!("Action: {}({}) → {}", action, args, result.output),
+                        MemoryType::Episodic,
+                        0.5,
+                        vec![self.identity.name.clone(), action],
+                    )
+                    .await;
             } else {
                 // Format error — help the LLM
                 messages.push(Message::user(
                     "Your response was not in the correct format. Please respond with:\n\
                      Thought: <reasoning>\nAction: <tool_name>\nAction Input: <JSON args>\n\n\
-                     Or:\nThought: <reasoning>\nAnswer: <final answer>"
+                     Or:\nThought: <reasoning>\nAnswer: <final answer>",
                 ));
             }
         }
 
         // Max steps reached — force final answer
-        messages.push(Message::user("Maximum steps reached. Please provide your final answer now."));
+        messages.push(Message::user(
+            "Maximum steps reached. Please provide your final answer now.",
+        ));
         let final_resp = self.engine.chat(&messages).await?;
-        let answer = self.parse_answer(&final_resp.content).unwrap_or(final_resp.content);
+        let answer = self
+            .parse_answer(&final_resp.content)
+            .unwrap_or(final_resp.content);
         Ok(answer)
     }
 
@@ -263,11 +303,21 @@ impl SpecialistAgent {
     fn parse_action(&self, text: &str) -> Option<(String, String)> {
         let action_idx = text.find("Action:")?;
         let after_action = &text[action_idx + "Action:".len()..];
-        let action = after_action.lines().next()?.trim().to_lowercase().to_string();
+        let action = after_action
+            .lines()
+            .next()?
+            .trim()
+            .to_lowercase()
+            .to_string();
 
         let input_idx = text.find("Action Input:")?;
         let after_input = &text[input_idx + "Action Input:".len()..];
-        let input = after_input.lines().next().unwrap_or("{}").trim().to_string();
+        let input = after_input
+            .lines()
+            .next()
+            .unwrap_or("{}")
+            .trim()
+            .to_string();
 
         Some((action, input))
     }
@@ -393,16 +443,24 @@ impl Orchestrator {
              3. Any dependencies on other sub-tasks\n\n\
              Format as a JSON array where each entry has: description, assigned_to, dependencies.\n\
              Do NOT use markdown code blocks — output pure JSON only.",
-            self.specialists.keys().cloned().collect::<Vec<_>>().join(", "),
+            self.specialists
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", "),
             task
         );
 
         let resp = self.engine.chat(&[Message::user(&prompt)]).await?;
 
         // Parse JSON response
-        let json_str = resp.content.trim()
-            .trim_start_matches("```json").trim_start_matches("```")
-            .trim_end_matches("```").trim();
+        let json_str = resp
+            .content
+            .trim()
+            .trim_start_matches("```json")
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim();
 
         let tasks_data: Vec<serde_json::Value> = match serde_json::from_str(json_str) {
             Ok(v) => v,
@@ -419,41 +477,61 @@ impl Orchestrator {
             }
         };
 
-        let tasks: Vec<Task> = tasks_data.into_iter().map(|t| {
-            let desc = t["description"].as_str().unwrap_or(task);
-            let agent = t["assigned_to"].as_str().unwrap_or("coding-agent");
-            let deps: Vec<String> = t["dependencies"].as_array()
-                .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
-                .unwrap_or_default();
+        let tasks: Vec<Task> = tasks_data
+            .into_iter()
+            .map(|t| {
+                let desc = t["description"].as_str().unwrap_or(task);
+                let agent = t["assigned_to"].as_str().unwrap_or("coding-agent");
+                let deps: Vec<String> = t["dependencies"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default();
 
-            // Find the best agent if specified agent doesn't exist
-            let assigned = if self.specialists.contains_key(agent) {
-                agent.to_string()
-            } else {
-                // Fallback: try to find a suitable agent
-                let lower_desc = desc.to_lowercase();
-                if lower_desc.contains("code") || lower_desc.contains("implement") || lower_desc.contains("write") {
-                    "coding-agent".to_string()
-                } else if lower_desc.contains("search") || lower_desc.contains("research") || lower_desc.contains("find") {
-                    "research-agent".to_string()
-                } else if lower_desc.contains("system") || lower_desc.contains("deploy") || lower_desc.contains("infra") {
-                    "system-agent".to_string()
-                } else if lower_desc.contains("monitor") || lower_desc.contains("watch") || lower_desc.contains("alert") {
-                    "monitoring-agent".to_string()
+                // Find the best agent if specified agent doesn't exist
+                let assigned = if self.specialists.contains_key(agent) {
+                    agent.to_string()
                 } else {
-                    "coding-agent".to_string()
-                }
-            };
+                    // Fallback: try to find a suitable agent
+                    let lower_desc = desc.to_lowercase();
+                    if lower_desc.contains("code")
+                        || lower_desc.contains("implement")
+                        || lower_desc.contains("write")
+                    {
+                        "coding-agent".to_string()
+                    } else if lower_desc.contains("search")
+                        || lower_desc.contains("research")
+                        || lower_desc.contains("find")
+                    {
+                        "research-agent".to_string()
+                    } else if lower_desc.contains("system")
+                        || lower_desc.contains("deploy")
+                        || lower_desc.contains("infra")
+                    {
+                        "system-agent".to_string()
+                    } else if lower_desc.contains("monitor")
+                        || lower_desc.contains("watch")
+                        || lower_desc.contains("alert")
+                    {
+                        "monitoring-agent".to_string()
+                    } else {
+                        "coding-agent".to_string()
+                    }
+                };
 
-            Task {
-                id: format!("task-{}", chrono::Utc::now().timestamp_nanos()),
-                description: desc.to_string(),
-                assigned_to: assigned,
-                context: HashMap::new(),
-                dependencies: deps,
-                status: TaskStatus::Pending,
-            }
-        }).collect();
+                Task {
+                    id: format!("task-{}", chrono::Utc::now().timestamp_nanos()),
+                    description: desc.to_string(),
+                    assigned_to: assigned,
+                    context: HashMap::new(),
+                    dependencies: deps,
+                    status: TaskStatus::Pending,
+                }
+            })
+            .collect();
 
         Ok(tasks)
     }
@@ -465,7 +543,10 @@ impl Orchestrator {
         let sub_tasks = self.decompose(task).await?;
         let mut results: HashMap<String, String> = HashMap::new();
 
-        tracing::info!("[Orchestrator] Decomposed into {} sub-tasks", sub_tasks.len());
+        tracing::info!(
+            "[Orchestrator] Decomposed into {} sub-tasks",
+            sub_tasks.len()
+        );
 
         // Execute sub-tasks respecting dependencies
         let mut remaining: Vec<Task> = sub_tasks;
@@ -479,9 +560,11 @@ impl Orchestrator {
 
                 // Check dependencies
                 let deps_met = task.dependencies.iter().all(|dep| {
-                    results.contains_key(dep) || completed.iter().any(|c: &Task| {
-                        c.description.contains(dep) && matches!(c.status, TaskStatus::Completed(_))
-                    })
+                    results.contains_key(dep)
+                        || completed.iter().any(|c: &Task| {
+                            c.description.contains(dep)
+                                && matches!(c.status, TaskStatus::Completed(_))
+                        })
                 });
 
                 if !deps_met {
@@ -492,18 +575,29 @@ impl Orchestrator {
                 let mut agent_task = remaining.remove(i);
                 agent_task.status = TaskStatus::InProgress;
 
-                tracing::info!("[Orchestrator] Assigning to {}: {}", agent_task.assigned_to, &agent_task.description);
+                tracing::info!(
+                    "[Orchestrator] Assigning to {}: {}",
+                    agent_task.assigned_to,
+                    &agent_task.description
+                );
 
                 let result = match self.specialists.get(&agent_task.assigned_to) {
                     Some(agent) => {
                         let enriched_task = format!(
                             "Context from previous steps:\n{}\n\nTask: {}",
-                            results.values().cloned().collect::<Vec<_>>().join("\n---\n"),
+                            results
+                                .values()
+                                .cloned()
+                                .collect::<Vec<_>>()
+                                .join("\n---\n"),
                             agent_task.description
                         );
                         agent.run(&enriched_task).await
                     }
-                    None => Err(anyhow::anyhow!("Unknown specialist: {}", agent_task.assigned_to)),
+                    None => Err(anyhow::anyhow!(
+                        "Unknown specialist: {}",
+                        agent_task.assigned_to
+                    )),
                 };
 
                 match result {
@@ -525,7 +619,10 @@ impl Orchestrator {
             if !progress {
                 // Deadlock or no runnable tasks — force schedule the first one
                 if let Some(mut task) = remaining.pop() {
-                    tracing::warn!("[Orchestrator] Force-executing task (possible deadlock): {}", task.description);
+                    tracing::warn!(
+                        "[Orchestrator] Force-executing task (possible deadlock): {}",
+                        task.description
+                    );
                     task.status = TaskStatus::InProgress;
 
                     let result = match self.specialists.get(&task.assigned_to) {
@@ -570,10 +667,16 @@ impl Orchestrator {
 
         // Record feedback
         if let Some(ref fb) = self.feedback {
-            let success_rate = completed.iter()
+            let success_rate = completed
+                .iter()
                 .filter(|t| matches!(t.status, TaskStatus::Completed(_)))
-                .count() as f64 / completed.len().max(1) as f64;
-            fb.record_quality(success_rate, &format!("Multi-agent task completed: {}", task)).await;
+                .count() as f64
+                / completed.len().max(1) as f64;
+            fb.record_quality(
+                success_rate,
+                &format!("Multi-agent task completed: {}", task),
+            )
+            .await;
         }
 
         Ok(final_resp.content)
@@ -587,9 +690,10 @@ impl Orchestrator {
     /// Get task status.
     pub async fn task_status(&self) -> Vec<(String, String)> {
         let tasks = self.tasks.read().await;
-        tasks.iter().map(|t| {
-            (t.description.clone(), format!("{:?}", t.status))
-        }).collect()
+        tasks
+            .iter()
+            .map(|t| (t.description.clone(), format!("{:?}", t.status)))
+            .collect()
     }
 }
 
@@ -610,17 +714,15 @@ mod tests {
         tools.register(Box::new(ThinkTool));
 
         let memory = LongTermMemory::new(
-            MemoryConfig { db_path: String::new(), ..Default::default() },
+            MemoryConfig {
+                db_path: String::new(),
+                ..Default::default()
+            },
             Arc::new(MockEngine::new()),
             "test-agent",
         );
 
-        let agent = SpecialistAgent::new(
-            AgentIdentity::coding(),
-            engine,
-            tools,
-            memory,
-        );
+        let agent = SpecialistAgent::new(AgentIdentity::coding(), engine, tools, memory);
 
         assert_eq!(agent.identity.name, "coding-agent");
     }
@@ -640,7 +742,10 @@ mod tests {
         let specialist_engine = Box::new(MockEngine::new());
         let tools = ToolRegistry::new();
         let memory = LongTermMemory::new(
-            MemoryConfig { db_path: String::new(), ..Default::default() },
+            MemoryConfig {
+                db_path: String::new(),
+                ..Default::default()
+            },
             Arc::new(MockEngine::new()),
             "coding-agent",
         );
@@ -653,7 +758,9 @@ mod tests {
         ));
 
         assert_eq!(orchestrator.agent_status().len(), 1);
-        assert!(orchestrator.agent_status().contains(&"coding-agent".to_string()));
+        assert!(orchestrator
+            .agent_status()
+            .contains(&"coding-agent".to_string()));
     }
 
     #[test]

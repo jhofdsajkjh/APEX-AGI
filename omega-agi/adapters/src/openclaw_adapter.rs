@@ -1,5 +1,5 @@
 //! OMEGA AGI - OpenClaw Adapter
-//! 
+//!
 //! Adapter for integrating with OpenClaw agent system.
 //! Provides compatibility with OpenClaw message protocol, skill loading,
 //! and agent communication standards.
@@ -24,7 +24,10 @@ pub enum OpenClawMessage {
     #[serde(rename = "text")]
     Text { content: String },
     #[serde(rename = "image")]
-    Image { image_key: String, caption: Option<String> },
+    Image {
+        image_key: String,
+        caption: Option<String>,
+    },
     #[serde(rename = "file")]
     File { file_key: String, name: String },
     #[serde(rename = "post")]
@@ -114,16 +117,13 @@ pub struct OpenClawSenderId {
 }
 
 /// OpenClaw skill definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OpenClawSkill {
     pub name: String,
     pub description: String,
     pub location: String,
     pub trigger: Vec<String>,
 }
-
-
 
 /// OpenClaw agent protocol message
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,14 +183,24 @@ impl Default for OpenClawSkillLoader {
 /// OpenClaw message adapter trait
 pub trait OpenClawAdapterTrait: Send + Sync {
     /// Process incoming OpenClaw message
-    fn process_message(&self, message: OpenClawAgentMessage) -> impl std::future::Future<Output = Result<OpenClawMessage>> + Send;
-    
+    fn process_message(
+        &self,
+        message: OpenClawAgentMessage,
+    ) -> impl std::future::Future<Output = Result<OpenClawMessage>> + Send;
+
     /// Send message through OpenClaw
-    fn send_message(&self, message: OpenClawMessage, chat_id: &str) -> impl std::future::Future<Output = Result<String>> + Send;
-    
+    fn send_message(
+        &self,
+        message: OpenClawMessage,
+        chat_id: &str,
+    ) -> impl std::future::Future<Output = Result<String>> + Send;
+
     /// Load skills from OpenClaw skill directory
-    fn load_skills(&self, skill_dir: &str) -> impl std::future::Future<Output = Result<Vec<OpenClawSkill>>> + Send;
-    
+    fn load_skills(
+        &self,
+        skill_dir: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<OpenClawSkill>>> + Send;
+
     /// Get adapter info
     fn adapter_info(&self) -> AdapterInfo;
 }
@@ -222,7 +232,8 @@ impl Default for AdapterInfo {
 
 /// OpenClaw adapter implementation
 pub struct OpenClawAdapter {
-    #[allow(unused)] skill_loader: OpenClawSkillLoader,
+    #[allow(unused)]
+    skill_loader: OpenClawSkillLoader,
     info: AdapterInfo,
 }
 
@@ -241,16 +252,23 @@ impl OpenClawAdapter {
 
     /// Parse incoming message from OpenClaw webhook/event
     pub fn parse_event(&self, payload: &[u8]) -> Result<OpenClawAgentMessage> {
-        serde_json::from_slice(payload).map_err(|e| anyhow::anyhow!("Failed to parse OpenClaw event: {}", e))
+        serde_json::from_slice(payload)
+            .map_err(|e| anyhow::anyhow!("Failed to parse OpenClaw event: {}", e))
     }
 
     /// Build response message
     pub fn build_text_response(&self, content: &str) -> OpenClawMessage {
-        OpenClawMessage::Text { content: content.to_string() }
+        OpenClawMessage::Text {
+            content: content.to_string(),
+        }
     }
 
     /// Build interactive card response
-    pub fn build_card_response(&self, title: &str, elements: Vec<OpenClawCardElement>) -> OpenClawMessage {
+    pub fn build_card_response(
+        &self,
+        title: &str,
+        elements: Vec<OpenClawCardElement>,
+    ) -> OpenClawMessage {
         OpenClawMessage::Interactive {
             card: OpenClawCard {
                 config: Some(OpenClawCardConfig {
@@ -281,19 +299,19 @@ impl Default for OpenClawAdapter {
 impl OpenClawAdapterTrait for OpenClawAdapter {
     async fn process_message(&self, message: OpenClawAgentMessage) -> Result<OpenClawMessage> {
         tracing::info!("Processing OpenClaw message: {}", message.message_id);
-        
+
         // Parse content based on message type
         match message.message_type.as_str() {
-            "text" => {
-                Ok(OpenClawMessage::Text { content: message.content })
-            }
+            "text" => Ok(OpenClawMessage::Text {
+                content: message.content,
+            }),
             "post" => {
                 let post: OpenClawPostContent = serde_json::from_str(&message.content)?;
                 Ok(OpenClawMessage::Post { content: post })
             }
-            _ => {
-                Ok(OpenClawMessage::Text { content: message.content })
-            }
+            _ => Ok(OpenClawMessage::Text {
+                content: message.content,
+            }),
         }
     }
 
@@ -319,7 +337,7 @@ pub mod protocol {
     pub const MESSAGE_TYPE_FILE: &str = "file";
     pub const MESSAGE_TYPE_POST: &str = "post";
     pub const MESSAGE_TYPE_INTERACTIVE: &str = "interactive";
-    
+
     pub const CHAT_TYPE_P2P: &str = "p2p";
     pub const CHAT_TYPE_GROUP: &str = "group";
 }
@@ -331,17 +349,17 @@ mod tests {
     #[tokio::test]
     async fn test_skill_loader() {
         let loader = OpenClawSkillLoader::new();
-        
+
         let skill = OpenClawSkill {
             name: "test_skill".to_string(),
             description: "A test skill".to_string(),
             location: "/skills/test".to_string(),
             trigger: vec!["test".to_string()],
         };
-        
+
         loader.register(skill.clone()).await.unwrap();
         let found = loader.find_by_trigger("test").await;
-        
+
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "test_skill");
     }
@@ -351,7 +369,7 @@ mod tests {
         let msg = OpenClawMessage::Text {
             content: "Hello OpenClaw".to_string(),
         };
-        
+
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("Hello OpenClaw"));
     }
@@ -360,7 +378,7 @@ mod tests {
     fn test_adapter_info() {
         let adapter = OpenClawAdapter::new();
         let info = adapter.adapter_info();
-        
+
         assert_eq!(info.name, "OpenClaw Adapter");
         assert!(info.capabilities.contains(&"message_sending".to_string()));
     }

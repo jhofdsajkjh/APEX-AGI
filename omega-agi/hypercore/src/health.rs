@@ -1,12 +1,12 @@
 //! # HyperCore Health Monitor
 //! Tracks subsystem health and provides health snapshots.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// Health status of a single subsystem.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,14 +2,18 @@
 // Layer 3 - Code Engineering & Quality Assurance
 
 pub mod code_generator;
-pub mod test_runner;
 pub mod pr_manager;
 pub mod quality_gate;
+pub mod test_runner;
 
-pub use code_generator::{CodeGenerator, GeneratedCode, Language, CodeQuality, CodeContext, GenError};
-pub use test_runner::{TestHarness, TestResult, RustTestCase, PythonTestCase, TestSummary, TestError, TimeoutConfig};
-pub use pr_manager::{PRManager, PRState, PRStatus, Review, ReviewState, CheckRun, PRError};
-pub use quality_gate::{QualityGate, GateResult, GateContext, QualityGateRunner, PhaseResult};
+pub use code_generator::{
+    CodeContext, CodeGenerator, CodeQuality, GenError, GeneratedCode, Language,
+};
+pub use pr_manager::{CheckRun, PRError, PRManager, PRState, PRStatus, Review, ReviewState};
+pub use quality_gate::{GateContext, GateResult, PhaseResult, QualityGate, QualityGateRunner};
+pub use test_runner::{
+    PythonTestCase, RustTestCase, TestError, TestHarness, TestResult, TestSummary, TimeoutConfig,
+};
 
 /// Engineering version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

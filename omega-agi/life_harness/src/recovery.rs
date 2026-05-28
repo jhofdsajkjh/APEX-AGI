@@ -63,7 +63,10 @@ impl RecoveryManager {
         let action = if !self.auto_recovery {
             RecoveryAction::None
         } else if count <= 2 {
-            RecoveryAction::RestartSubsystem(format!("Subsystem restart (attempt {}/3): {}", count, reason))
+            RecoveryAction::RestartSubsystem(format!(
+                "Subsystem restart (attempt {}/3): {}",
+                count, reason
+            ))
         } else if count <= 5 {
             RecoveryAction::ResetToLastGood
         } else if count <= 8 {

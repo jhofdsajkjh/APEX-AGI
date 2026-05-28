@@ -1,17 +1,13 @@
 //! # Omega Evolution Library
 //! Layer 3 - Self-evolution engine for continuous performance improvement.
 
+pub mod apex_core;
 pub mod auto_evolve;
 pub mod self_evolve;
-pub mod apex_core;
 
 pub use self_evolve::{
+    EvolutionMetrics, EvolutionResult, EvolverConfig, ImprovementResult, PerformanceSnapshot,
     SelfEvolver,
-    EvolverConfig,
-    EvolutionResult,
-    EvolutionMetrics,
-    ImprovementResult,
-    PerformanceSnapshot,
 };
 
 pub use auto_evolve::AutoEvolve;
@@ -19,8 +15,8 @@ pub use auto_evolve::AutoEvolveConfig;
 pub use auto_evolve::AutoEvolveResult;
 
 pub use apex_core::{
-    compute_apex, apex_fitness, apex_guidance, format_apex_state,
-    ApexInput, ApexState, ApexGuidance,
+    apex_fitness, apex_guidance, compute_apex, format_apex_state, ApexGuidance, ApexInput,
+    ApexState,
 };
 
 /// Evolution engine version

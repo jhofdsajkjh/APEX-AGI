@@ -88,7 +88,11 @@ impl Analyzer {
             issues_pending: issues.len() as u32,
             recommendations,
             strengths,
-            risk_level: if issues.is_empty() { RiskLevel::Low } else { RiskLevel::Medium },
+            risk_level: if issues.is_empty() {
+                RiskLevel::Low
+            } else {
+                RiskLevel::Medium
+            },
         }
     }
 }

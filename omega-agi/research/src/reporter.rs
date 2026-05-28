@@ -41,7 +41,12 @@ impl Reporter {
     }
 
     /// Generate a complete research report
-    pub fn generate(&self, topic: &str, extraction: &Extraction, sources: &[FetchedContent]) -> String {
+    pub fn generate(
+        &self,
+        topic: &str,
+        extraction: &Extraction,
+        sources: &[FetchedContent],
+    ) -> String {
         match self.format {
             ReportFormat::Markdown => self.generate_markdown(topic, extraction, sources),
             ReportFormat::Json => self.generate_json(topic, extraction, sources),
@@ -49,14 +54,22 @@ impl Reporter {
         }
     }
 
-    fn generate_markdown(&self, topic: &str, extraction: &Extraction, sources: &[FetchedContent]) -> String {
+    fn generate_markdown(
+        &self,
+        topic: &str,
+        extraction: &Extraction,
+        sources: &[FetchedContent],
+    ) -> String {
         let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
         let mut report = String::new();
 
         report.push_str(&format!("# 🔬 Research Report: {}\n\n", topic));
         report.push_str(&format!("> Generated: {}  \n", timestamp));
         report.push_str(&format!("> Sources: {}  \n", sources.len()));
-        report.push_str(&format!("> Relevance: {:.1}%  \n\n", extraction.relevance * 100.0));
+        report.push_str(&format!(
+            "> Relevance: {:.1}%  \n\n",
+            extraction.relevance * 100.0
+        ));
 
         report.push_str("## 📋 Executive Summary\n\n");
         report.push_str(&extraction.summary);
@@ -78,7 +91,12 @@ impl Reporter {
         report
     }
 
-    fn generate_json(&self, topic: &str, extraction: &Extraction, sources: &[FetchedContent]) -> String {
+    fn generate_json(
+        &self,
+        topic: &str,
+        extraction: &Extraction,
+        sources: &[FetchedContent],
+    ) -> String {
         let json = serde_json::json!({
             "report": {
                 "topic": topic,
@@ -99,11 +117,22 @@ impl Reporter {
         serde_json::to_string_pretty(&json).unwrap_or_default()
     }
 
-    fn generate_text(&self, topic: &str, extraction: &Extraction, sources: &[FetchedContent]) -> String {
+    fn generate_text(
+        &self,
+        topic: &str,
+        extraction: &Extraction,
+        sources: &[FetchedContent],
+    ) -> String {
         let mut report = String::new();
-        report.push_str(&format!("=== RESEARCH REPORT: {} ===\n\n", topic.to_uppercase()));
+        report.push_str(&format!(
+            "=== RESEARCH REPORT: {} ===\n\n",
+            topic.to_uppercase()
+        ));
         report.push_str(&format!("Sources: {}\n", sources.len()));
-        report.push_str(&format!("Relevance: {:.1}%\n\n", extraction.relevance * 100.0));
+        report.push_str(&format!(
+            "Relevance: {:.1}%\n\n",
+            extraction.relevance * 100.0
+        ));
         report.push_str("SUMMARY:\n");
         report.push_str(&extraction.summary);
         report.push_str("\n\nKEY FINDINGS:\n");

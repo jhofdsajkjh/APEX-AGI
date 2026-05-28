@@ -57,7 +57,8 @@ impl Extractor {
                 if sent_lower.len() < 20 {
                     continue;
                 }
-                let has_keyword = topic_lower.split_whitespace()
+                let has_keyword = topic_lower
+                    .split_whitespace()
                     .any(|w| sent_lower.contains(w));
                 if has_keyword {
                     let point = sentence.trim().to_string();
@@ -89,10 +90,14 @@ impl Extractor {
 
         // Deduplicate and limit key points
         all_points.sort_by(|a, b| {
-            let a_rel = topic_lower.split_whitespace()
-                .filter(|w| a.to_lowercase().contains(w)).count();
-            let b_rel = topic_lower.split_whitespace()
-                .filter(|w| b.to_lowercase().contains(w)).count();
+            let a_rel = topic_lower
+                .split_whitespace()
+                .filter(|w| a.to_lowercase().contains(w))
+                .count();
+            let b_rel = topic_lower
+                .split_whitespace()
+                .filter(|w| b.to_lowercase().contains(w))
+                .count();
             b_rel.cmp(&a_rel)
         });
         all_points.truncate(10);

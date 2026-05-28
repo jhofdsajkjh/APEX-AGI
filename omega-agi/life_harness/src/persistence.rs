@@ -63,12 +63,14 @@ impl SessionStore {
         let now = chrono::Utc::now().to_rfc3339();
         let mut sessions = self.sessions.write().await;
 
-        let entry = sessions.entry(session_id.to_string()).or_insert_with(|| SessionEntry {
-            session_id: session_id.to_string(),
-            created: now.clone(),
-            updated: now.clone(),
-            data: HashMap::new(),
-        });
+        let entry = sessions
+            .entry(session_id.to_string())
+            .or_insert_with(|| SessionEntry {
+                session_id: session_id.to_string(),
+                created: now.clone(),
+                updated: now.clone(),
+                data: HashMap::new(),
+            });
 
         entry.updated = now;
         entry.data.insert(key.to_string(), value.to_string());

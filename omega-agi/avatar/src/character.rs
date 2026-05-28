@@ -9,11 +9,11 @@ use tokio::sync::RwLock;
 /// Character identifiers
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CharacterId {
-    Sage,       // Wise, philosophical AI
-    Engineer,   // Technical, precise, analytical
-    Companion,  // Warm, friendly, supportive
-    Maverick,   // Creative, unpredictable, bold
-    Guardian,   // Protective, ethical, cautious
+    Sage,      // Wise, philosophical AI
+    Engineer,  // Technical, precise, analytical
+    Companion, // Warm, friendly, supportive
+    Maverick,  // Creative, unpredictable, bold
+    Guardian,  // Protective, ethical, cautious
     Default,
 }
 
@@ -55,7 +55,7 @@ pub struct Character {
     name: String,
     title: String,
     tagline: String,
-    color: &'static str,  // ANSI color code
+    color: &'static str, // ANSI color code
     emotion: Arc<RwLock<EmotionalState>>,
     mood: Arc<RwLock<String>>,
     system_prompt: String,
@@ -103,12 +103,24 @@ impl Character {
         }
     }
 
-    pub fn id(&self) -> CharacterId { self.id }
-    pub fn name(&self) -> &str { &self.name }
-    pub fn title(&self) -> &str { &self.title }
-    pub fn tagline(&self) -> &str { &self.tagline }
-    pub fn color(&self) -> &str { self.color }
-    pub fn system_prompt(&self) -> &str { &self.system_prompt }
+    pub fn id(&self) -> CharacterId {
+        self.id
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+    pub fn tagline(&self) -> &str {
+        &self.tagline
+    }
+    pub fn color(&self) -> &str {
+        self.color
+    }
+    pub fn system_prompt(&self) -> &str {
+        &self.system_prompt
+    }
 
     pub fn emotion(&self) -> EmotionalState {
         *self.emotion.blocking_read()

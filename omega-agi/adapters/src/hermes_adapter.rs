@@ -1,5 +1,5 @@
 //! OMEGA AGI - Hermes Adapter
-//! 
+//!
 //! Adapter for integrating with Hermes-Agent system.
 //! Provides compatibility with Hermes message format, workflow execution,
 //! and API adaptation.
@@ -44,26 +44,20 @@ pub enum HermesMessage {
 }
 
 /// Hermes request parameters
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HermesParams {
     #[serde(flatten)]
     pub data: std::collections::HashMap<String, serde_json::Value>,
 }
 
-
-
 /// Hermes execution context
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HermesContext {
     pub session_id: Option<String>,
     pub user_id: Option<String>,
     pub workspace: Option<String>,
     pub metadata: HashMap<String, String>,
 }
-
-
 
 /// Hermes status codes
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,9 +177,11 @@ impl HermesWorkflowEngine {
 
     /// Create a new task from workflow
     pub async fn create_task(&self, workflow_id: &str) -> Result<HermesTask> {
-        let _workflow = self.get_workflow(workflow_id).await
+        let _workflow = self
+            .get_workflow(workflow_id)
+            .await
             .ok_or_else(|| anyhow::anyhow!("Workflow not found: {}", workflow_id))?;
-        
+
         let now = chrono::Utc::now().to_rfc3339();
         let task = HermesTask {
             task_id: generate_id(),
@@ -195,21 +191,25 @@ impl HermesWorkflowEngine {
             created_at: now.clone(),
             updated_at: now,
         };
-        
+
         let mut tasks = self.tasks.write().await;
         tasks.insert(task.task_id.clone(), task.clone());
-        
+
         Ok(task)
     }
 
     /// Execute workflow step
-    pub async fn execute_step(&self, task: &mut HermesTask, step: &HermesWorkflowStep) -> Result<()> {
+    pub async fn execute_step(
+        &self,
+        task: &mut HermesTask,
+        step: &HermesWorkflowStep,
+    ) -> Result<()> {
         task.status = HermesTaskStatus::Running;
         task.updated_at = chrono::Utc::now().to_rfc3339();
-        
+
         // Simulate step execution
         tracing::info!("Executing step: {} - {}", step.id, step.action);
-        
+
         // In real implementation, execute the action
         task.result = Some(serde_json::json!({
             "step_id": step.id,
@@ -217,7 +217,7 @@ impl HermesWorkflowEngine {
         }));
         task.status = HermesTaskStatus::Completed;
         task.updated_at = chrono::Utc::now().to_rfc3339();
-        
+
         Ok(())
     }
 }
@@ -230,7 +230,8 @@ impl Default for HermesWorkflowEngine {
 
 /// Hermes API client
 pub struct HermesApiClient {
-    #[allow(unused)] base_url: String,
+    #[allow(unused)]
+    base_url: String,
     api_key: Option<String>,
 }
 
@@ -267,11 +268,17 @@ impl HermesApiClient {
 /// Hermes adapter trait
 pub trait HermesAdapterTrait: Send + Sync {
     /// Send request to Hermes
-    fn send_request(&self, message: HermesMessage) -> impl std::future::Future<Output = Result<HermesMessage>> + Send;
-    
+    fn send_request(
+        &self,
+        message: HermesMessage,
+    ) -> impl std::future::Future<Output = Result<HermesMessage>> + Send;
+
     /// Execute workflow
-    fn execute_workflow(&self, workflow: HermesWorkflow) -> impl std::future::Future<Output = Result<HermesTask>> + Send;
-    
+    fn execute_workflow(
+        &self,
+        workflow: HermesWorkflow,
+    ) -> impl std::future::Future<Output = Result<HermesTask>> + Send;
+
     /// Get adapter info
     fn adapter_info(&self) -> HermesAdapterInfo;
 }
@@ -329,9 +336,14 @@ impl Default for HermesAdapter {
 impl HermesAdapterTrait for HermesAdapter {
     async fn send_request(&self, message: HermesMessage) -> Result<HermesMessage> {
         match message {
-            HermesMessage::Request { id, action, params, context: _ } => {
+            HermesMessage::Request {
+                id,
+                action,
+                params,
+                context: _,
+            } => {
                 tracing::info!("Hermes request: {} - {}", id, action);
-                
+
                 // Build response
                 Ok(HermesMessage::Response {
                     id,
@@ -350,15 +362,17 @@ impl HermesAdapterTrait for HermesAdapter {
 
     async fn execute_workflow(&self, workflow: HermesWorkflow) -> Result<HermesTask> {
         // Register workflow
-        self.workflow_engine.register_workflow(workflow.clone()).await?;
-        
+        self.workflow_engine
+            .register_workflow(workflow.clone())
+            .await?;
+
         // Create and execute task
         let mut task = self.workflow_engine.create_task(&workflow.id).await?;
-        
+
         for step in &workflow.steps {
             self.workflow_engine.execute_step(&mut task, step).await?;
         }
-        
+
         Ok(task)
     }
 
@@ -372,7 +386,7 @@ pub mod protocol {
     pub const HERMES_API_VERSION: &str = "v1";
     pub const DEFAULT_TIMEOUT_MS: u64 = 30000;
     pub const MAX_RETRY_ATTEMPTS: u32 = 3;
-    
+
     // Status codes
     pub const STATUS_OK: u32 = 200;
     pub const STATUS_BAD_REQUEST: u32 = 400;
@@ -392,7 +406,7 @@ mod tests {
             params: HermesParams::default(),
             context: None,
         };
-        
+
         let json = serde_json::to_string(&msg).unwrap();
         assert!(json.contains("req_123"));
     }
@@ -402,15 +416,13 @@ mod tests {
         let workflow = HermesWorkflow {
             id: "wf_001".to_string(),
             name: "Test Workflow".to_string(),
-            steps: vec![
-                HermesWorkflowStep {
-                    id: "step_1".to_string(),
-                    action: "init".to_string(),
-                    params: HermesParams::default(),
-                    retry: None,
-                    timeout_ms: Some(5000),
-                },
-            ],
+            steps: vec![HermesWorkflowStep {
+                id: "step_1".to_string(),
+                action: "init".to_string(),
+                params: HermesParams::default(),
+                retry: None,
+                timeout_ms: Some(5000),
+            }],
             metadata: HermesWorkflowMetadata {
                 version: "1.0".to_string(),
                 author: Some("Test".to_string()),
@@ -418,7 +430,7 @@ mod tests {
                 tags: vec!["test".to_string()],
             },
         };
-        
+
         assert_eq!(workflow.id, "wf_001");
         assert_eq!(workflow.steps.len(), 1);
     }
@@ -426,17 +438,17 @@ mod tests {
     #[tokio::test]
     async fn test_workflow_engine() {
         let engine = HermesWorkflowEngine::new();
-        
+
         let workflow = HermesWorkflow {
             id: "wf_test".to_string(),
             name: "Test".to_string(),
             steps: vec![],
             metadata: HermesWorkflowMetadata::default(),
         };
-        
+
         engine.register_workflow(workflow).await.unwrap();
         let found = engine.get_workflow("wf_test").await;
-        
+
         assert!(found.is_some());
     }
 }

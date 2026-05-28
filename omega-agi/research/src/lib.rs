@@ -16,18 +16,18 @@
 //! └── Knowledge  (graph + cross-ref)
 //! ```
 
-pub mod searcher;
 pub mod extractor;
 pub mod reporter;
+pub mod searcher;
 
 pub mod knowledge;
 
+use extractor::Extractor;
+use knowledge::KnowledgeGraph;
+use reporter::{Report, ReportFormat, Reporter};
+use searcher::{FetchedContent, Searcher};
 use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
-use searcher::{FetchedContent, Searcher};
-use extractor::Extractor;
-use reporter::{Reporter, ReportFormat, Report};
-use knowledge::KnowledgeGraph;
 
 /// Configuration for the research engine
 #[derive(Debug, Clone)]
@@ -161,7 +161,10 @@ impl Researcher {
 
         // Step 3: Update knowledge graph
         if self.config.enable_knowledge_graph {
-            self.knowledge.lock().unwrap().ingest(topic, &fetched, &extraction.key_points);
+            self.knowledge
+                .lock()
+                .unwrap()
+                .ingest(topic, &fetched, &extraction.key_points);
         }
 
         // Step 4: Generate report
@@ -230,8 +233,6 @@ impl Default for Researcher {
     }
 }
 
-
-
 fn extract_tags(topic: &str, key_points: &[String]) -> Vec<String> {
     let mut tags: Vec<String> = topic
         .split_whitespace()
@@ -240,7 +241,9 @@ fn extract_tags(topic: &str, key_points: &[String]) -> Vec<String> {
         .collect();
     for point in key_points.iter().take(5) {
         for word in point.split_whitespace() {
-            let w = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+            let w = word
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase();
             if w.len() > 4 && !tags.contains(&w) {
                 tags.push(w);
             }

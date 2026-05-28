@@ -1,13 +1,13 @@
 //! # Engineering Test Runner
 //! Multi-language test harness that discovers, runs, and reports test results.
 
-use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use anyhow::Result;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
+use thiserror::Error;
 use tokio::process::Command;
 use tokio::time::timeout;
-use regex::Regex;
 
 /// Timeout configuration for test execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,11 +77,18 @@ pub struct TestSummary {
 }
 
 impl TestSummary {
-    pub fn passed(&self) -> usize { self.passed }
-    pub fn total(&self) -> usize { self.total }
+    pub fn passed(&self) -> usize {
+        self.passed
+    }
+    pub fn total(&self) -> usize {
+        self.total
+    }
     pub fn success_rate(&self) -> f64 {
-        if self.total == 0 { 1.0 }
-        else { self.passed as f64 / self.total as f64 }
+        if self.total == 0 {
+            1.0
+        } else {
+            self.passed as f64 / self.total as f64
+        }
     }
 }
 
@@ -127,7 +134,8 @@ impl TestHarness {
 
     /// Parse the summary line `test result: ok|FAILED. N passed; M failed; ...`
     fn parse_summary_line(line: &str) -> Option<(bool, usize, usize)> {
-        let re = Regex::new(r"test result:\s+(ok|FAILED)\.\s*(\d+)\s+passed;\s*(\d+)\s+failed").ok()?;
+        let re =
+            Regex::new(r"test result:\s+(ok|FAILED)\.\s*(\d+)\s+passed;\s*(\d+)\s+failed").ok()?;
         if let Some(caps) = re.captures(line) {
             let passed = caps.get(1)?.as_str() == "ok";
             let passed_count: usize = caps.get(2)?.as_str().parse().ok()?;
@@ -139,7 +147,10 @@ impl TestHarness {
     }
 
     /// Execute `cargo test` and return parsed results.
-    async fn run_cargo_test(&self, extra_args: &[&str]) -> Result<(Vec<TestResult>, Vec<String>), TestError> {
+    async fn run_cargo_test(
+        &self,
+        extra_args: &[&str],
+    ) -> Result<(Vec<TestResult>, Vec<String>), TestError> {
         let per_test_timeout = Duration::from_millis(self.config.per_test_ms);
 
         let mut cmd = Command::new("cargo");
@@ -152,7 +163,8 @@ impl TestHarness {
             .await
             .map_err(|_| TestError::Timeout(self.config.per_test_ms))?;
 
-        let output = output.map_err(|e| TestError::Internal(format!("failed to execute cargo test: {e}")))?;
+        let output = output
+            .map_err(|e| TestError::Internal(format!("failed to execute cargo test: {e}")))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -166,7 +178,11 @@ impl TestHarness {
                     name: format!("rust::{name}"),
                     passed,
                     duration_ms: 0,
-                    error_message: if passed { None } else { Some("Test failed".to_string()) },
+                    error_message: if passed {
+                        None
+                    } else {
+                        Some("Test failed".to_string())
+                    },
                 });
             }
         }
@@ -204,20 +220,18 @@ impl TestHarness {
                     results,
                 }
             }
-            Err(e) => {
-                TestSummary {
-                    total: 0,
-                    passed: 0,
-                    failed: 0,
-                    total_duration_ms: start.elapsed().as_millis() as u64,
-                    results: vec![TestResult {
-                        name: "cargo test".to_string(),
-                        passed: false,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                        error_message: Some(e.to_string()),
-                    }],
-                }
-            }
+            Err(e) => TestSummary {
+                total: 0,
+                passed: 0,
+                failed: 0,
+                total_duration_ms: start.elapsed().as_millis() as u64,
+                results: vec![TestResult {
+                    name: "cargo test".to_string(),
+                    passed: false,
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    error_message: Some(e.to_string()),
+                }],
+            },
         }
     }
 
@@ -267,20 +281,18 @@ impl TestHarness {
                     results,
                 }
             }
-            Err(e) => {
-                TestSummary {
-                    total: 0,
-                    passed: 0,
-                    failed: 0,
-                    total_duration_ms: start.elapsed().as_millis() as u64,
-                    results: vec![TestResult {
-                        name: "cargo test".to_string(),
-                        passed: false,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                        error_message: Some(e.to_string()),
-                    }],
-                }
-            }
+            Err(e) => TestSummary {
+                total: 0,
+                passed: 0,
+                failed: 0,
+                total_duration_ms: start.elapsed().as_millis() as u64,
+                results: vec![TestResult {
+                    name: "cargo test".to_string(),
+                    passed: false,
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    error_message: Some(e.to_string()),
+                }],
+            },
         }
     }
 
@@ -289,8 +301,11 @@ impl TestHarness {
         let start = Instant::now();
         let per_test_timeout = Duration::from_millis(self.config.per_test_ms);
 
-        let cmd_output = timeout(per_test_timeout, Command::new("cargo").arg("check").output())
-            .await;
+        let cmd_output = timeout(
+            per_test_timeout,
+            Command::new("cargo").arg("check").output(),
+        )
+        .await;
 
         let output = match cmd_output {
             Ok(Ok(out)) => out,
@@ -361,14 +376,20 @@ impl TestHarness {
 
     pub fn run_python_tests(&self) -> TestSummary {
         let start = Instant::now();
-        let results: Vec<TestResult> = self.python_tests.iter().map(|test| {
-            TestResult {
+        let results: Vec<TestResult> = self
+            .python_tests
+            .iter()
+            .map(|test| TestResult {
                 name: format!("python::{}", test.name),
                 passed: test.expected_to_pass,
                 duration_ms: 3,
-                error_message: if test.expected_to_pass { None } else { Some("Expected failure".to_string()) },
-            }
-        }).collect();
+                error_message: if test.expected_to_pass {
+                    None
+                } else {
+                    Some("Expected failure".to_string())
+                },
+            })
+            .collect();
 
         let total = results.len();
         let passed = results.iter().filter(|r| r.passed).count();

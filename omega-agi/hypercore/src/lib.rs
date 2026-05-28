@@ -3,26 +3,26 @@
 //! Zero-allocation async runtime with persistent memory and capability security.
 //! Layer 0 of the OMEGA AGI system.
 
-pub mod scheduler;
-pub mod memory;
-pub mod security;
-pub mod session;
+pub mod diagnostics;
 pub mod errors;
 pub mod health;
 pub mod logging;
+pub mod memory;
 pub mod pipeline;
-pub mod diagnostics;
+pub mod scheduler;
+pub mod security;
 pub mod self_heal;
+pub mod session;
 
-pub use scheduler::{TaskScheduler, TaskPriority, TaskId};
-pub use memory::{MemoryPool, MemoryStats};
-pub use security::{Capability, CapabilitySet, SecurityRing};
-pub use session::{SessionConfig, SessionManager};
+pub use diagnostics::{DiagnosticEngine, SubsystemHealth, SystemHealthReport};
 pub use errors::HyperCoreError;
 pub use health::{HealthMonitor, HealthSnapshot};
-pub use pipeline::{PipelineOrchestrator, PipelineResult, HealthCheck};
-pub use diagnostics::{DiagnosticEngine, SystemHealthReport, SubsystemHealth};
-pub use self_heal::{SelfHealingController, HealingAction, HealingResult, HealingEvent, Healer};
+pub use memory::{MemoryPool, MemoryStats};
+pub use pipeline::{HealthCheck, PipelineOrchestrator, PipelineResult};
+pub use scheduler::{TaskId, TaskPriority, TaskScheduler};
+pub use security::{Capability, CapabilitySet, SecurityRing};
+pub use self_heal::{Healer, HealingAction, HealingEvent, HealingResult, SelfHealingController};
+pub use session::{SessionConfig, SessionManager};
 
 /// HyperCore version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

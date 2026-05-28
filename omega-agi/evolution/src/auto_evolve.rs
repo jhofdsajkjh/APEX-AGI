@@ -21,12 +21,12 @@
 //! 4. `fix()` — 测试失败时自动分析错误并修复（最多重试 N 次）
 //! 5. `commit()` — 测试通过后 Git 存盘 + 可选推送
 
-use crate::self_evolve::{SelfEvolver, EvolutionResult, Genome};
-use crate::apex_core::{compute_apex, ApexInput, format_apex_state, apex_guidance, ApexState};
-use std::process::Command;
+use crate::apex_core::{apex_guidance, compute_apex, format_apex_state, ApexInput, ApexState};
+use crate::self_evolve::{EvolutionResult, Genome, SelfEvolver};
+use anyhow::{Context, Result};
 use std::path::Path;
+use std::process::Command;
 use std::time::Instant;
-use anyhow::{Result, Context};
 
 // ============================================================================
 // 配置
@@ -106,7 +106,10 @@ pub struct AutoEvolve {
 impl AutoEvolve {
     /// 创建新的 AutoEvolve 引擎
     pub fn new(config: AutoEvolveConfig) -> Self {
-        Self { config, iteration: 0 }
+        Self {
+            config,
+            iteration: 0,
+        }
     }
 
     /// 使用默认配置创建
@@ -120,7 +123,10 @@ impl AutoEvolve {
         self.iteration += 1;
 
         // Step 1: 演化
-        tracing::info!("[AutoEvolve] 🧬 Iteration {}: Running evolution...", self.iteration);
+        tracing::info!(
+            "[AutoEvolve] 🧬 Iteration {}: Running evolution...",
+            self.iteration
+        );
         let evolution = evolver.evolve();
         tracing::info!("[AutoEvolve] Evolution score: {:.4}", evolution.final_score);
 
@@ -195,7 +201,11 @@ impl AutoEvolve {
             fix_attempts,
             commit_hash,
             duration_ms,
-            error: if all_passed { None } else { Some("Tests did not pass after fix attempts".into()) },
+            error: if all_passed {
+                None
+            } else {
+                Some("Tests did not pass after fix attempts".into())
+            },
         }
     }
 
@@ -224,7 +234,11 @@ impl AutoEvolve {
             metrics.iterations,
             base_fitness,
             evolver.best_score(),
-            evolver.get_snapshots().iter().map(|s| s.score).collect::<Vec<f64>>(),
+            evolver
+                .get_snapshots()
+                .iter()
+                .map(|s| s.score)
+                .collect::<Vec<f64>>(),
             evolver.get_diversity(),
             evolver.config().population_size as usize,
             evolver.get_current_genome().learning_rate,
@@ -236,17 +250,27 @@ impl AutoEvolve {
 
         tracing::info!(
             "[AutoEvolve] 🧬 Φ_APEX*∞ fitness: {:.6} (base={:.4})",
-            apex_fit, base_fitness
+            apex_fit,
+            base_fitness
         );
-        tracing::debug!("[AutoEvolve] APEX state: {}", format_apex_state(&apex_state));
+        tracing::debug!(
+            "[AutoEvolve] APEX state: {}",
+            format_apex_state(&apex_state)
+        );
 
         // Use APEX guidance to modulate the evolver
         let guidance = apex_guidance(&apex_state, &apex_input);
         if guidance.should_rollback {
-            tracing::warn!("[AutoEvolve] ⚠️ APEX recommends rollback: {}", guidance.reasoning);
+            tracing::warn!(
+                "[AutoEvolve] ⚠️ APEX recommends rollback: {}",
+                guidance.reasoning
+            );
         }
         if guidance.increase_diversity {
-            tracing::warn!("[AutoEvolve] 🌱 APEX recommends diversity increase: {}", guidance.reasoning);
+            tracing::warn!(
+                "[AutoEvolve] 🌱 APEX recommends diversity increase: {}",
+                guidance.reasoning
+            );
         }
 
         // Run one evolution cycle with APEX-modulated fitness
@@ -274,7 +298,11 @@ impl AutoEvolve {
     /// 5. 生成代码
     /// 6. 测试 + 修复
     /// 7. 提交
-    pub fn run_once_full_apex(&mut self, evolver: &mut SelfEvolver, feedback: &crate::ApexGuidance) -> AutoEvolveResult {
+    pub fn run_once_full_apex(
+        &mut self,
+        evolver: &mut SelfEvolver,
+        feedback: &crate::ApexGuidance,
+    ) -> AutoEvolveResult {
         let start = Instant::now();
         self.iteration += 1;
 
@@ -284,7 +312,11 @@ impl AutoEvolve {
             metrics.iterations,
             evolver.current_score(),
             evolver.best_score(),
-            evolver.get_snapshots().iter().map(|s| s.score).collect::<Vec<f64>>(),
+            evolver
+                .get_snapshots()
+                .iter()
+                .map(|s| s.score)
+                .collect::<Vec<f64>>(),
             evolver.get_diversity(),
             evolver.config().population_size as usize,
             evolver.get_current_genome().learning_rate,
@@ -294,7 +326,8 @@ impl AutoEvolve {
         let apex_state = compute_apex(&apex_input);
         tracing::info!(
             "[AutoEvolve] 🧬 Iteration {}: Φ_APEX*∞ = {:.6}",
-            self.iteration, apex_state.apex_value
+            self.iteration,
+            apex_state.apex_value
         );
         tracing::debug!("[AutoEvolve] APEX: {}", format_apex_state(&apex_state));
 
@@ -303,7 +336,8 @@ impl AutoEvolve {
             let mut adjusted_genome = current_genome.clone();
             adjusted_genome.learning_rate *= feedback.lr_factor;
             adjusted_genome.learning_rate = adjusted_genome.learning_rate.clamp(0.0001, 0.1);
-            adjusted_genome.temperature = (adjusted_genome.temperature + feedback.temp_offset).clamp(0.0, 2.0);
+            adjusted_genome.temperature =
+                (adjusted_genome.temperature + feedback.temp_offset).clamp(0.0, 2.0);
             adjusted_genome.clamp();
             evolver.set_best_genome(adjusted_genome, apex_state.apex_value);
         }
@@ -384,7 +418,11 @@ impl AutoEvolve {
             fix_attempts,
             commit_hash,
             duration_ms,
-            error: if all_passed { None } else { Some("Tests did not pass after fix attempts".into()) },
+            error: if all_passed {
+                None
+            } else {
+                Some("Tests did not pass after fix attempts".into())
+            },
         }
     }
 
@@ -403,12 +441,10 @@ impl AutoEvolve {
 
         // 创建目录
         if let Some(parent) = config_path.parent() {
-            std::fs::create_dir_all(parent)
-                .context("Failed to create config directory")?;
+            std::fs::create_dir_all(parent).context("Failed to create config directory")?;
         }
 
-        std::fs::write(&config_path, &config_content)
-            .context("Failed to write evolved config")?;
+        std::fs::write(&config_path, &config_content).context("Failed to write evolved config")?;
 
         let path_str = config_path.to_string_lossy().to_string();
         files.push(path_str);
@@ -604,7 +640,11 @@ All intermediate values are computed and logged by the evolution engine.
 
         for i in 0..self.config.max_fix_retries {
             attempts += 1;
-            tracing::warn!("[AutoEvolve] 🔧 Fix attempt {}/{}", i + 1, self.config.max_fix_retries);
+            tracing::warn!(
+                "[AutoEvolve] 🔧 Fix attempt {}/{}",
+                i + 1,
+                self.config.max_fix_retries
+            );
 
             // 解析错误信息
             let fixes = self.parse_errors(&output);
@@ -627,7 +667,10 @@ All intermediate values are computed and logged by the evolution engine.
                 Ok(new_output) => {
                     output = new_output;
                     if output.contains("test result: ok") || output.contains("0 failed") {
-                        tracing::info!("[AutoEvolve] ✅ All tests pass after {} fix attempt(s)", attempts);
+                        tracing::info!(
+                            "[AutoEvolve] ✅ All tests pass after {} fix attempt(s)",
+                            attempts
+                        );
                         return (true, output, attempts);
                     }
                 }
@@ -705,7 +748,9 @@ All intermediate values are computed and logged by the evolution engine.
     /// 测试通过后自动 Git 提交
     fn git_commit(&self, evolution: &EvolutionResult) -> Result<String> {
         let root = &self.config.workspace_root;
-        let branch = self.config.branch_template
+        let branch = self
+            .config
+            .branch_template
             .replace("{iteration}", &self.iteration.to_string());
 
         // 确保在 worktree 根目录
@@ -764,11 +809,17 @@ All intermediate values are computed and logged by the evolution engine.
             .args(["rev-parse", "HEAD"])
             .current_dir(git_root)
             .output()?;
-        let hash = String::from_utf8_lossy(&hash_output.stdout).trim().to_string();
+        let hash = String::from_utf8_lossy(&hash_output.stdout)
+            .trim()
+            .to_string();
 
         // 4. 可选推送
         if self.config.auto_push {
-            tracing::info!("[AutoEvolve] Pushing to {} {}...", self.config.git_remote, branch);
+            tracing::info!(
+                "[AutoEvolve] Pushing to {} {}...",
+                self.config.git_remote,
+                branch
+            );
             let push = Command::new("git")
                 .args(["push", "-u", &self.config.git_remote, &branch])
                 .current_dir(git_root)
@@ -776,8 +827,10 @@ All intermediate values are computed and logged by the evolution engine.
                 .context("Git push failed")?;
 
             if !push.status.success() {
-                tracing::warn!("[AutoEvolve] Git push failed (non-fatal): {}",
-                    String::from_utf8_lossy(&push.stderr));
+                tracing::warn!(
+                    "[AutoEvolve] Git push failed (non-fatal): {}",
+                    String::from_utf8_lossy(&push.stderr)
+                );
             }
         }
 

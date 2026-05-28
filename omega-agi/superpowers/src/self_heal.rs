@@ -83,6 +83,8 @@ impl SelfHealEngine {
 
 /// Deterministic pseudo-random boolean based on string hash
 fn fast_random_bool(seed: &str) -> bool {
-    let hash: u64 = seed.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-    hash % 7 < 3  // ~43% chance of needing a fix
+    let hash: u64 = seed
+        .bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+    hash % 7 < 3 // ~43% chance of needing a fix
 }

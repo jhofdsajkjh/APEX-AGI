@@ -1,10 +1,10 @@
 //! # Runtime Graph Executor
 //! Executes task graphs (DAGs) for complex multi-step workflows.
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
+use thiserror::Error;
 
 /// Unique identifier for a graph node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -47,7 +47,7 @@ pub enum GraphExecutorError {
 pub struct TaskGraph {
     pub name: String,
     nodes: HashMap<NodeId, Vec<NodeId>>, // node -> dependencies
-    node_data: HashMap<NodeId, String>, // node -> description
+    node_data: HashMap<NodeId, String>,  // node -> description
 }
 
 impl TaskGraph {
@@ -86,7 +86,8 @@ impl TaskGraph {
             }
         }
 
-        let mut queue: VecDeque<&NodeId> = in_degree.iter()
+        let mut queue: VecDeque<&NodeId> = in_degree
+            .iter()
             .filter(|(_, &deg)| deg == 0)
             .map(|(node, _)| *node)
             .collect();
@@ -137,7 +138,9 @@ impl GraphExecutor {
     }
 
     pub fn execute_graph(&self, name: &str) -> Result<Vec<NodeResult>, GraphExecutorError> {
-        let graph = self.graphs.get(name)
+        let graph = self
+            .graphs
+            .get(name)
             .ok_or_else(|| GraphExecutorError::NodeNotFound(name.to_string()))?;
 
         let order = graph.topological_sort()?;

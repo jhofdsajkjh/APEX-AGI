@@ -15,21 +15,21 @@
 //! - **Layer 9** `omega_avatar` — Local human-like AI avatar with TUI interface
 //! - **Layer 10** `omega_transcendence` — Self-aware meta-cognition, emergent capability discovery
 
-pub use omega_hypercore as hypercore;
-pub use omega_runtime as runtime;
-pub use omega_engineering as engineering;
-pub use omega_evolution as evolution;
 pub use omega_adapters as adapters;
 pub use omega_agent as agent;
-pub use omega_research as research;
-pub use omega_life_harness as life_harness;
-pub use omega_superpowers as superpowers;
 pub use omega_avatar as avatar;
+pub use omega_engineering as engineering;
+pub use omega_evolution as evolution;
+pub use omega_hypercore as hypercore;
+pub use omega_life_harness as life_harness;
+pub use omega_research as research;
+pub use omega_runtime as runtime;
+pub use omega_superpowers as superpowers;
 pub use omega_transcendence as transcendence;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, RwLock};
 
 /// Cross-layer event types for the event bus
 #[derive(Debug, Clone)]
@@ -45,7 +45,11 @@ pub enum CrossLayerEvent {
     /// System needs healing
     HealingRequired { target: String, issue: String },
     /// Agent completed a task
-    TaskCompleted { agent: String, task: String, success: bool },
+    TaskCompleted {
+        agent: String,
+        task: String,
+        success: bool,
+    },
     /// Transcendence state change
     TranscendenceUpdate { awareness: f64, phase: String },
     /// Graceful shutdown requested
@@ -124,10 +128,15 @@ impl Config {
 
         Self {
             github_token: std::env::var("GITHUB_TOKEN").ok().filter(|s| !s.is_empty()),
-            openai_api_key: std::env::var("OPENAI_API_KEY").or_else(|_| std::env::var("OMEGA_API_KEY")).ok().filter(|s| !s.is_empty()),
+            openai_api_key: std::env::var("OPENAI_API_KEY")
+                .or_else(|_| std::env::var("OMEGA_API_KEY"))
+                .ok()
+                .filter(|s| !s.is_empty()),
             log_level: std::env::var("OMEGA_LOG_LEVEL").unwrap_or_else(|_| "info".into()),
             data_dir: std::env::var("OMEGA_DATA_DIR").unwrap_or_else(|_| "./data".into()),
-            enable_transcendence: std::env::var("OMEGA_TRANSCENDENCE").ok().map_or(true, |v| v != "0" && v != "false"),
+            enable_transcendence: std::env::var("OMEGA_TRANSCENDENCE")
+                .ok()
+                .map_or(true, |v| v != "0" && v != "false"),
         }
     }
 
@@ -194,7 +203,14 @@ impl OmegaAGI {
         health.insert("life_harness".into(), 0.9);
         health.insert("superpowers".into(), 0.8);
         health.insert("avatar".into(), 0.9);
-        health.insert("transcendence".into(), if config.enable_transcendence { 0.5 } else { 0.0 });
+        health.insert(
+            "transcendence".into(),
+            if config.enable_transcendence {
+                0.5
+            } else {
+                0.0
+            },
+        );
 
         Ok(Self {
             hypercore: omega_hypercore::HyperCore::new()?,
@@ -242,12 +258,16 @@ impl OmegaAGI {
         let state = self.transcendence.meta_cognition(health.clone()).await;
         let _discovered = self.transcendence.discover_emergent(&health).await;
         let _optimizations = self.transcendence.quantum_optimize(&health).await;
-        let _goals = self.transcendence.self_actualize(state.awareness_level).await;
+        let _goals = self
+            .transcendence
+            .self_actualize(state.awareness_level)
+            .await;
 
-        self.event_bus.publish(CrossLayerEvent::TranscendenceUpdate {
-            awareness: state.awareness_level,
-            phase: state.phase.clone(),
-        });
+        self.event_bus
+            .publish(CrossLayerEvent::TranscendenceUpdate {
+                awareness: state.awareness_level,
+                phase: state.phase.clone(),
+            });
 
         tracing::info!(
             awareness = %state.awareness_level,
@@ -270,7 +290,12 @@ impl OmegaAGI {
                 s if **s >= 0.6 => "🟡",
                 _ => "🔴",
             };
-            output.push_str(&format!("│  {} {:<14} {:>6.1}%\n", bar, layer, *score * 100.0));
+            output.push_str(&format!(
+                "│  {} {:<14} {:>6.1}%\n",
+                bar,
+                layer,
+                *score * 100.0
+            ));
         }
         output.push_str("└────────────────────────────────────────────────┘\n");
 
@@ -310,9 +335,7 @@ pub fn build_system_tool_registry(omega: &OmegaAGI) -> agent::tool::ToolRegistry
         "think",
         "Use this tool for internal reasoning and planning",
         serde_json::json!({"thought": {"type": "string", "description": "Your reasoning"}}),
-        std::sync::Arc::new(|_args| {
-            agent::tool::ToolResult::ok("think", "Thought recorded")
-        }),
+        std::sync::Arc::new(|_args| agent::tool::ToolResult::ok("think", "Thought recorded")),
     )));
 
     tools.register(Box::new(FnTool::new(
@@ -320,7 +343,10 @@ pub fn build_system_tool_registry(omega: &OmegaAGI) -> agent::tool::ToolRegistry
         "Check the health status of all OMEGA AGI layers",
         serde_json::json!({}),
         std::sync::Arc::new(|_args| {
-            agent::tool::ToolResult::ok("check_health", "Use the 'health' CLI command for full details")
+            agent::tool::ToolResult::ok(
+                "check_health",
+                "Use the 'health' CLI command for full details",
+            )
         }),
     )));
 
@@ -329,7 +355,10 @@ pub fn build_system_tool_registry(omega: &OmegaAGI) -> agent::tool::ToolRegistry
         "Get detailed system resource usage (CPU, memory, disk, network)",
         serde_json::json!({}),
         std::sync::Arc::new(|_args| {
-            agent::tool::ToolResult::ok("system_status", "Use the 'life resources' CLI command for details")
+            agent::tool::ToolResult::ok(
+                "system_status",
+                "Use the 'life resources' CLI command for details",
+            )
         }),
     )));
 
@@ -338,7 +367,10 @@ pub fn build_system_tool_registry(omega: &OmegaAGI) -> agent::tool::ToolRegistry
         "List all available protocol adapters (OpenClaw, Hermes, OpenHuman, Feishu)",
         serde_json::json!({}),
         std::sync::Arc::new(|_args| {
-            agent::tool::ToolResult::ok("list_adapters", "Available adapters: OpenClaw, Hermes, OpenHuman, Feishu")
+            agent::tool::ToolResult::ok(
+                "list_adapters",
+                "Available adapters: OpenClaw, Hermes, OpenHuman, Feishu",
+            )
         }),
     )));
 

@@ -43,13 +43,22 @@ pub struct Message {
 
 impl Message {
     pub fn system(content: impl Into<String>) -> Self {
-        Self { role: "system".into(), content: content.into() }
+        Self {
+            role: "system".into(),
+            content: content.into(),
+        }
     }
     pub fn user(content: impl Into<String>) -> Self {
-        Self { role: "user".into(), content: content.into() }
+        Self {
+            role: "user".into(),
+            content: content.into(),
+        }
     }
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { role: "assistant".into(), content: content.into() }
+        Self {
+            role: "assistant".into(),
+            content: content.into(),
+        }
     }
 }
 
@@ -98,19 +107,26 @@ impl LLMClient {
     }
 
     pub fn from_env() -> Self {
-        let api_url = std::env::var("OMEGA_API_URL")
-            .unwrap_or_else(|_| "https://api.openai.com/v1".into());
+        let api_url =
+            std::env::var("OMEGA_API_URL").unwrap_or_else(|_| "https://api.openai.com/v1".into());
         let api_key = std::env::var("OMEGA_API_KEY").unwrap_or_default();
-        let model = std::env::var("OMEGA_MODEL_NAME")
-            .unwrap_or_else(|_| "gpt-4o".into());
+        let model = std::env::var("OMEGA_MODEL_NAME").unwrap_or_else(|_| "gpt-4o".into());
         let max_tokens = std::env::var("OMEGA_MAX_TOKENS")
-            .ok().and_then(|v| v.parse().ok())
+            .ok()
+            .and_then(|v| v.parse().ok())
             .unwrap_or(4096);
         let temperature = std::env::var("OMEGA_TEMPERATURE")
-            .ok().and_then(|v| v.parse().ok())
+            .ok()
+            .and_then(|v| v.parse().ok())
             .unwrap_or(0.7);
 
-        Self::new(LLMConfig { api_url, api_key, model, max_tokens, temperature })
+        Self::new(LLMConfig {
+            api_url,
+            api_key,
+            model,
+            max_tokens,
+            temperature,
+        })
     }
 
     pub async fn chat(&self, messages: &[Message]) -> anyhow::Result<String> {
@@ -125,8 +141,12 @@ impl LLMClient {
             temperature: self.config.temperature,
         };
 
-        let url = format!("{}/chat/completions", self.config.api_url.trim_end_matches('/'));
-        let response = self.client
+        let url = format!(
+            "{}/chat/completions",
+            self.config.api_url.trim_end_matches('/')
+        );
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&body)
@@ -155,20 +175,27 @@ impl LLMClient {
             .map(|m| m.content.as_str())
             .unwrap_or("");
 
-        if user_msg.contains("健康") || user_msg.contains("health") || user_msg.contains("检查") {
-            return dedent!(r#"
+        if user_msg.contains("健康") || user_msg.contains("health") || user_msg.contains("检查")
+        {
+            return dedent!(
+                r#"
                 Thought: The user wants a health check. I'll use the health tool.
                 Action: health
                 Action Input: {}
-            "#).to_string();
+            "#
+            )
+            .to_string();
         }
 
         if user_msg.contains("诊断") || user_msg.contains("diagnos") {
-            return dedent!(r#"
+            return dedent!(
+                r#"
                 Thought: The user wants a full system diagnostic. I'll run diagnostics.
                 Action: diagnose
                 Action Input: {}
-            "#).to_string();
+            "#
+            )
+            .to_string();
         }
 
         if user_msg.contains("代码") || user_msg.contains("code") || user_msg.contains("生成") {
@@ -178,10 +205,13 @@ impl LLMClient {
             "#).to_string();
         }
 
-        dedent!(r#"
+        dedent!(
+            r#"
             Thought: I'll first check the system health to understand the current state.
             Action: health
             Action Input: {}
-        "#).to_string()
+        "#
+        )
+        .to_string()
     }
 }

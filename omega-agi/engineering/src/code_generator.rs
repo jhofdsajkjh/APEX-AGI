@@ -16,19 +16,19 @@ use thiserror::Error;
 pub enum GenError {
     #[error("Generation failed: {0}")]
     GenerationFailed(String),
-    
+
     #[error("Invalid prompt: {0}")]
     InvalidPrompt(String),
-    
+
     #[error("Syntax validation failed: {0}")]
     SyntaxError(String),
-    
+
     #[error("LLM API error: {0}")]
     ApiError(String),
-    
+
     #[error("Formatting failed: {0}")]
     FormatError(String),
-    
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
@@ -100,38 +100,46 @@ impl GeneratedCode {
     /// 检查代码是否包含常见Rust错误模式
     pub fn check_rust_antipatterns(&self) -> Vec<String> {
         let mut warnings = Vec::new();
-        
+
         if self.language != Language::Rust && self.language != Language::Both {
             return warnings;
         }
 
         let code_lower = self.code.to_lowercase();
-        
+
         if code_lower.contains(".unwrap()") {
-            warnings.push("Use of .unwrap() detected - consider using ? or expect with message".to_string());
+            warnings.push(
+                "Use of .unwrap() detected - consider using ? or expect with message".to_string(),
+            );
         }
-        
+
         if code_lower.contains(".expect(") {
-            warnings.push("Use of .expect() detected - prefer ? operator for error propagation".to_string());
+            warnings.push(
+                "Use of .expect() detected - prefer ? operator for error propagation".to_string(),
+            );
         }
-        
+
         if code_lower.contains("panic!") {
             warnings.push("Use of panic! detected - consider returning Result instead".to_string());
         }
-        
+
         if code_lower.contains("unsafe ") {
             warnings.push("Use of unsafe block detected - ensure memory safety".to_string());
         }
-        
+
         if code_lower.contains(".unwrap_or(") {
-            warnings.push("Use of unwrap_or detected - unwrap_or_else is more efficient".to_string());
+            warnings
+                .push("Use of unwrap_or detected - unwrap_or_else is more efficient".to_string());
         }
-        
+
         let clone_count = code_lower.matches(".clone()").count();
         if clone_count > 3 {
-            warnings.push(format!("High clone usage ({} clones) - consider using references", clone_count));
+            warnings.push(format!(
+                "High clone usage ({} clones) - consider using references",
+                clone_count
+            ));
         }
-        
+
         warnings
     }
 
@@ -141,39 +149,41 @@ impl GeneratedCode {
             overall_score: self.confidence,
             ..Default::default()
         };
-        
+
         let lines: Vec<&str> = self.code.lines().collect();
         let non_empty_lines = lines.iter().filter(|l| !l.trim().is_empty()).count();
-        let comment_lines = lines.iter().filter(|l| {
-            let trimmed = l.trim();
-            trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*")
-        }).count();
-        
+        let comment_lines = lines
+            .iter()
+            .filter(|l| {
+                let trimmed = l.trim();
+                trimmed.starts_with("//") || trimmed.starts_with('#') || trimmed.starts_with("/*")
+            })
+            .count();
+
         if non_empty_lines > 0 {
             let comment_ratio = comment_lines as f32 / non_empty_lines as f32;
             quality.readability = (0.5 + 0.5 * comment_ratio.min(0.3) / 0.3).min(1.0);
         }
-        
+
         let warnings = self.check_rust_antipatterns();
         quality.safety = (1.0 - (warnings.len() as f32 * 0.1)).max(0.0);
-        
+
         let function_count = self.code.matches("fn ").count();
         let struct_count = self.code.matches("struct ").count();
         let maintainability_factor = (function_count + struct_count) as f32;
         quality.maintainability = (0.5 + (maintainability_factor * 0.05)).min(1.0);
-        
+
         quality.performance = if warnings.iter().any(|w| w.contains("clone")) {
             0.7
         } else {
             0.85
         };
-        
-        quality.overall_score = 
-            quality.readability * 0.25 +
-            quality.maintainability * 0.25 +
-            quality.safety * 0.30 +
-            quality.performance * 0.20;
-        
+
+        quality.overall_score = quality.readability * 0.25
+            + quality.maintainability * 0.25
+            + quality.safety * 0.30
+            + quality.performance * 0.20;
+
         quality
     }
 }
@@ -208,8 +218,10 @@ impl Default for TemplateLibrary {
         let mut templates: HashMap<String, Vec<String>> = HashMap::new();
 
         // Rust 函数模式
-        templates.insert("rust_function".to_string(), vec![
-            r#"/// {doc_comment}
+        templates.insert(
+            "rust_function".to_string(),
+            vec![
+                r#"/// {doc_comment}
 ///
 /// # Arguments
 ///
@@ -225,8 +237,9 @@ impl Default for TemplateLibrary {
 pub fn {fn_name}({params}) -> Result<{return_type}, Box<dyn std::error::Error>> {
     // TODO: Implement {fn_name}
     todo!("Implement {fn_name}")
-}"#.to_string(),
-            r#"/// {doc_comment}
+}"#
+                .to_string(),
+                r#"/// {doc_comment}
 ///
 /// # Arguments
 ///
@@ -238,12 +251,15 @@ pub fn {fn_name}({params}) -> Result<{return_type}, Box<dyn std::error::Error>> 
 pub fn {fn_name}({params}) -> {return_type} {
     // TODO: Implement {fn_name}
     todo!("Implement {fn_name}")
-}"#.to_string(),
-        ]);
+}"#
+                .to_string(),
+            ],
+        );
 
         // Rust 结构体模式
-        templates.insert("rust_struct".to_string(), vec![
-            r#"/// {doc_comment}
+        templates.insert(
+            "rust_struct".to_string(),
+            vec![r#"/// {doc_comment}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct {struct_name} {
 {fields}
@@ -256,12 +272,14 @@ impl {struct_name} {
 {field_inits}
         }
     }
-}"#.to_string(),
-        ]);
+}"#
+            .to_string()],
+        );
 
         // Rust async 函数模式
-        templates.insert("rust_async".to_string(), vec![
-            r#"/// {doc_comment}
+        templates.insert(
+            "rust_async".to_string(),
+            vec![r#"/// {doc_comment}
 ///
 /// # Arguments
 ///
@@ -277,12 +295,14 @@ impl {struct_name} {
 pub async fn {fn_name}({params}) -> Result<{return_type}, Box<dyn std::error::Error>> {
     // TODO: Implement {fn_name}
     todo!("Implement {fn_name}")
-}"#.to_string(),
-        ]);
+}"#
+            .to_string()],
+        );
 
         // Rust 错误处理模式
-        templates.insert("rust_error".to_string(), vec![
-            r#"#[derive(Debug, thiserror::Error)]
+        templates.insert(
+            "rust_error".to_string(),
+            vec![r#"#[derive(Debug, thiserror::Error)]
 pub enum {error_name} {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
@@ -292,12 +312,14 @@ pub enum {error_name} {
     NotFound(String),
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-}"#.to_string(),
-        ]);
+}"#
+            .to_string()],
+        );
 
         // Rust trait 模式
-        templates.insert("rust_trait".to_string(), vec![
-            r#"/// {doc_comment}
+        templates.insert(
+            "rust_trait".to_string(),
+            vec![r#"/// {doc_comment}
 pub trait {trait_name} {
     /// {method_doc}
     fn {method_name}({params}) -> {return_type};
@@ -308,12 +330,14 @@ impl {trait_name} for {impl_type} {
         // TODO: Implement {method_name} for {impl_type}
         todo!("Implement {method_name} for {impl_type}")
     }
-}"#.to_string(),
-        ]);
+}"#
+            .to_string()],
+        );
 
         // Rust 测试模式
-        templates.insert("rust_test".to_string(), vec![
-            r#"#[cfg(test)]
+        templates.insert(
+            "rust_test".to_string(),
+            vec![r#"#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -333,12 +357,15 @@ mod tests {
     fn test_{fn_name}_error_handling() {
         // TODO: Add error handling tests
     }
-}"#.to_string(),
-        ]);
+}"#
+            .to_string()],
+        );
 
         // Python 函数模式
-        templates.insert("python_function".to_string(), vec![
-            r#"""\"{doc_comment}
+        templates.insert(
+            "python_function".to_string(),
+            vec![
+                r#"""\"{doc_comment}
     
     Args:
         {params}: {param_desc}
@@ -352,8 +379,9 @@ mod tests {
 def {fn_name}({params}) -> {return_type}:
     # TODO: Implement {fn_name}
     raise NotImplementedError("{fn_name} not implemented")
-"#.to_string(),
-            r#"""\"{doc_comment}
+"#
+                .to_string(),
+                r#"""\"{doc_comment}
     
     Args:
         {params}: {param_desc}
@@ -364,12 +392,15 @@ def {fn_name}({params}) -> {return_type}:
 def {fn_name}({params}) -> {return_type}:
     # TODO: Implement {fn_name}
     raise NotImplementedError("{fn_name} not implemented")
-"#.to_string(),
-        ]);
+"#
+                .to_string(),
+            ],
+        );
 
         // Python 类模式
-        templates.insert("python_class".to_string(), vec![
-            r#"class {class_name}:
+        templates.insert(
+            "python_class".to_string(),
+            vec![r#"class {class_name}:
     """{doc_comment}"""
     
     def __init__(self{params}):
@@ -380,12 +411,14 @@ def {fn_name}({params}) -> {return_type}:
         \"\"\"{method_doc}\"\"\"
         # TODO: Implement {method_name}
         raise NotImplementedError("{method_name} not implemented")
-"#.to_string(),
-        ]);
+"#
+            .to_string()],
+        );
 
         // Python async 函数模式
-        templates.insert("python_async".to_string(), vec![
-            r#"import asyncio
+        templates.insert(
+            "python_async".to_string(),
+            vec![r#"import asyncio
 
 async def {fn_name}({params}) -> {return_type}:
     """{doc_comment}
@@ -401,12 +434,14 @@ async def {fn_name}({params}) -> {return_type}:
     """
     # TODO: Implement {fn_name}
     raise NotImplementedError("{fn_name} not implemented")
-"#.to_string(),
-        ]);
+"#
+            .to_string()],
+        );
 
         // Python 错误处理模式
-        templates.insert("python_error".to_string(), vec![
-            r#"class {error_name}(Exception):
+        templates.insert(
+            "python_error".to_string(),
+            vec![r#"class {error_name}(Exception):
     """{doc_comment}"""
     pass
 
@@ -417,12 +452,14 @@ class InvalidInputError({error_name}):
 class OperationFailedError({error_name}):
     """Raised when an operation fails."""
     pass
-"#.to_string(),
-        ]);
+"#
+            .to_string()],
+        );
 
         // Python 测试模式
-        templates.insert("python_test".to_string(), vec![
-            r#"import pytest
+        templates.insert(
+            "python_test".to_string(),
+            vec![r#"import pytest
 from {module} import {fn_name}
 
 def test_{fn_name}_basic():
@@ -438,12 +475,14 @@ def test_{fn_name}_error_handling():
     # TODO: Add error handling tests
     with pytest.raises(Exception):
         {fn_name}(None)
-"#.to_string(),
-        ]);
+"#
+            .to_string()],
+        );
 
         // Rust 文档注释模板
-        templates.insert("rust_doc_comment".to_string(), vec![
-            r#"/// {doc_comment}
+        templates.insert(
+            "rust_doc_comment".to_string(),
+            vec![r#"/// {doc_comment}
 ///
 /// # Examples
 ///
@@ -453,8 +492,9 @@ def test_{fn_name}_error_handling():
 /// let result = {fn_name}({example_args});
 /// assert!(result.is_ok());
 /// ```
-"#.to_string(),
-        ]);
+"#
+            .to_string()],
+        );
 
         Self { templates }
     }
@@ -559,11 +599,15 @@ impl CodeGenerator {
     /// 生成代码
     pub fn generate(&self, prompt: &str, lang: Language) -> Result<GeneratedCode, GenError> {
         if prompt.trim().is_empty() {
-            return Err(GenError::InvalidPrompt("Prompt cannot be empty".to_string()));
+            return Err(GenError::InvalidPrompt(
+                "Prompt cannot be empty".to_string(),
+            ));
         }
 
         if lang == Language::Both {
-            return Err(GenError::InvalidPrompt("Use generate_with_context for Language::Both".to_string()));
+            return Err(GenError::InvalidPrompt(
+                "Use generate_with_context for Language::Both".to_string(),
+            ));
         }
 
         let context = CodeContext {
@@ -576,9 +620,15 @@ impl CodeGenerator {
     }
 
     /// 带上下文的代码生成
-    pub fn generate_with_context(&self, prompt: &str, context: &CodeContext) -> Result<GeneratedCode, GenError> {
+    pub fn generate_with_context(
+        &self,
+        prompt: &str,
+        context: &CodeContext,
+    ) -> Result<GeneratedCode, GenError> {
         if prompt.trim().is_empty() {
-            return Err(GenError::InvalidPrompt("Prompt cannot be empty".to_string()));
+            return Err(GenError::InvalidPrompt(
+                "Prompt cannot be empty".to_string(),
+            ));
         }
 
         let lang = context.language.as_ref().cloned().unwrap_or(Language::Rust);
@@ -604,7 +654,11 @@ impl CodeGenerator {
     }
 
     /// 内部代码生成
-    fn generate_code_internal(&self, _prompt: &str, lang: &Language) -> Result<GeneratedCode, GenError> {
+    fn generate_code_internal(
+        &self,
+        _prompt: &str,
+        lang: &Language,
+    ) -> Result<GeneratedCode, GenError> {
         let (code, confidence, tokens) = match lang {
             Language::Rust => {
                 let code = r#"/// Executes the main processing pipeline
@@ -640,7 +694,8 @@ pub enum PipelineError {
     InvalidInput(String),
     TransformationFailed(String),
     LogicError(String),
-}"#.to_string();
+}"#
+                .to_string();
                 (code, 0.85, 350)
             }
             Language::Python => {
@@ -680,11 +735,14 @@ def apply_logic(data: bytes) -> bytes:
 
 class PipelineError(Exception):
     """Pipeline processing error."""
-    pass"#.to_string();
+    pass"#
+                    .to_string();
                 (code, 0.85, 320)
             }
             Language::Both => {
-                return Err(GenError::InvalidPrompt("Language::Both requires separate calls".to_string()));
+                return Err(GenError::InvalidPrompt(
+                    "Language::Both requires separate calls".to_string(),
+                ));
             }
         };
 
@@ -711,11 +769,13 @@ class PipelineError(Exception):
 
         if let Some(ref mut stdin) = child.stdin {
             use std::io::Write;
-            stdin.write_all(code.as_bytes())
+            stdin
+                .write_all(code.as_bytes())
                 .map_err(|e| GenError::SyntaxError(e.to_string()))?;
         }
 
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| GenError::SyntaxError(e.to_string()))?;
 
         if !output.status.success() {
@@ -739,11 +799,13 @@ class PipelineError(Exception):
 
         if let Some(ref mut stdin) = child.stdin {
             use std::io::Write;
-            stdin.write_all(code.as_bytes())
+            stdin
+                .write_all(code.as_bytes())
                 .map_err(|e| GenError::SyntaxError(e.to_string()))?;
         }
 
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| GenError::SyntaxError(e.to_string()))?;
 
         if !output.status.success() {
@@ -767,11 +829,13 @@ class PipelineError(Exception):
 
         if let Some(ref mut stdin) = child.stdin {
             use std::io::Write;
-            stdin.write_all(code.as_bytes())
+            stdin
+                .write_all(code.as_bytes())
                 .map_err(|e| GenError::FormatError(e.to_string()))?;
         }
 
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| GenError::FormatError(e.to_string()))?;
 
         if !output.status.success() {
@@ -796,11 +860,13 @@ class PipelineError(Exception):
 
         if let Some(ref mut stdin) = child.stdin {
             use std::io::Write;
-            stdin.write_all(code.as_bytes())
+            stdin
+                .write_all(code.as_bytes())
                 .map_err(|e| GenError::FormatError(e.to_string()))?;
         }
 
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| GenError::FormatError(e.to_string()))?;
 
         if !output.status.success() {
@@ -815,7 +881,7 @@ class PipelineError(Exception):
     /// 生成质量报告
     pub fn generate_quality_report(&self, code: &GeneratedCode) -> String {
         let mut report = String::new();
-        
+
         report.push_str("# Code Quality Report\n\n");
         report.push_str(&format!("Language: {}\n", code.language));
         report.push_str(&format!("Confidence: {:.2}\n", code.confidence));
@@ -825,7 +891,10 @@ class PipelineError(Exception):
             report.push_str("## Quality Scores\n\n");
             report.push_str(&format!("- Overall: {:.2}\n", quality.overall_score));
             report.push_str(&format!("- Readability: {:.2}\n", quality.readability));
-            report.push_str(&format!("- Maintainability: {:.2}\n", quality.maintainability));
+            report.push_str(&format!(
+                "- Maintainability: {:.2}\n",
+                quality.maintainability
+            ));
             report.push_str(&format!("- Safety: {:.2}\n", quality.safety));
             report.push_str(&format!("- Performance: {:.2}\n", quality.performance));
         }
@@ -872,7 +941,7 @@ mod tests {
         let gen = CodeGenerator::new();
         let result = gen.generate("Implement a pipeline function", Language::Rust);
         assert!(result.is_ok());
-        
+
         let code = result.unwrap();
         assert_eq!(code.language, Language::Rust);
         assert!(!code.code.is_empty());
@@ -883,7 +952,7 @@ mod tests {
         let gen = CodeGenerator::new();
         let result = gen.generate("Implement a pipeline function", Language::Python);
         assert!(result.is_ok());
-        
+
         let code = result.unwrap();
         assert_eq!(code.language, Language::Python);
         assert!(!code.code.is_empty());
@@ -898,7 +967,7 @@ mod tests {
             imports: vec!["std::collections".to_string()],
             ..Default::default()
         };
-        
+
         let result = gen.generate_with_context("Add a function", &context);
         assert!(result.is_ok());
     }
@@ -909,14 +978,15 @@ mod tests {
             code: r#"/// Test function
 pub fn test() {
     println!("hello");
-}"#.to_string(),
+}"#
+            .to_string(),
             language: Language::Rust,
             confidence: 0.9,
             tokens_used: 100,
             quality: None,
             warnings: Vec::new(),
         };
-        
+
         let quality = generated.compute_quality_score();
         assert!(quality.overall_score > 0.0);
         assert!(quality.safety > 0.0);
@@ -928,14 +998,15 @@ pub fn test() {
             code: r#"fn test() {
     let x = Some(1).unwrap();
     panic!("error");
-}"#.to_string(),
+}"#
+            .to_string(),
             language: Language::Rust,
             confidence: 0.5,
             tokens_used: 50,
             quality: None,
             warnings: Vec::new(),
         };
-        
+
         let warnings = code.check_rust_antipatterns();
         assert!(warnings.len() >= 2);
         assert!(warnings.iter().any(|w| w.contains("unwrap")));
@@ -959,7 +1030,7 @@ pub fn test() {
             }),
             warnings: vec!["test warning".to_string()],
         };
-        
+
         let report = gen.generate_quality_report(&code);
         assert!(report.contains("Quality Scores"));
         assert!(report.contains("Warnings"));

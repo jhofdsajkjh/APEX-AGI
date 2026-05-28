@@ -1,12 +1,12 @@
 //! # Runtime Effect System
 //! Manages side effects in the actor system with lifecycle tracking.
 
+use anyhow::Result;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
-use anyhow::Result;
 
 /// Unique effect identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -52,9 +52,7 @@ pub struct Effect {
 
 impl std::fmt::Debug for Effect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Effect")
-            .field("name", &self.name)
-            .finish()
+        f.debug_struct("Effect").field("name", &self.name).finish()
     }
 }
 
@@ -81,24 +79,22 @@ impl EffectSystem {
         let start = std::time::Instant::now();
 
         let result = match self.effects.read().get(name) {
-            Some(effect) => {
-                match (effect.handler)(input) {
-                    Ok(output) => EffectResult {
-                        effect_id,
-                        success: true,
-                        output: Some(output),
-                        error: None,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                    },
-                    Err(e) => EffectResult {
-                        effect_id,
-                        success: false,
-                        output: None,
-                        error: Some(e.to_string()),
-                        duration_ms: start.elapsed().as_millis() as u64,
-                    },
-                }
-            }
+            Some(effect) => match (effect.handler)(input) {
+                Ok(output) => EffectResult {
+                    effect_id,
+                    success: true,
+                    output: Some(output),
+                    error: None,
+                    duration_ms: start.elapsed().as_millis() as u64,
+                },
+                Err(e) => EffectResult {
+                    effect_id,
+                    success: false,
+                    output: None,
+                    error: Some(e.to_string()),
+                    duration_ms: start.elapsed().as_millis() as u64,
+                },
+            },
             None => EffectResult {
                 effect_id,
                 success: false,

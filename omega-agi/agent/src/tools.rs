@@ -1,9 +1,9 @@
 //! Tool system — updated to use Tool trait internally while keeping
 //! the old ToolContext/ToolResult API for backward compatibility.
 
+use crate::tool::{Tool, ToolRegistry, ToolResult as NewToolResult};
 use async_trait::async_trait;
 use serde::Serialize;
-use crate::tool::{Tool, ToolRegistry, ToolResult as NewToolResult};
 use std::sync::Arc;
 
 // Re-export for backward compatibility
@@ -86,7 +86,10 @@ pub trait ToolContext: Send + Sync {
 pub fn tool_descriptions_prompt() -> String {
     let mut out = String::from("You have access to the following tools:\n\n");
     for t in ALL_TOOLS {
-        out.push_str(&format!("- **{}**: {}  \n  Args JSON schema: `{}`\n\n", t.name, t.description, t.args_json_schema));
+        out.push_str(&format!(
+            "- **{}**: {}  \n  Args JSON schema: `{}`\n\n",
+            t.name, t.description, t.args_json_schema
+        ));
     }
     out.push_str(
         "You MUST respond in this exact format:\n\n\

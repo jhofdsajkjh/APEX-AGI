@@ -4,10 +4,10 @@
 //! crossover, elitism selection, adaptive mutation rate, A/B testing, lineage tracking,
 //! and auto-rollback.
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 // ============================================================================
 // Genome: The evolvable parameter set
@@ -128,15 +128,22 @@ impl Genome {
         sum += (self.momentum - other.momentum).powi(2);
         sum += (self.grad_clip - other.grad_clip).powi(2) / 100.0;
         sum += (self.num_heads as f64 - other.num_heads as f64).powi(2) / (32.0_f64).powi(2);
-        sum += (self.context_size as f64 - other.context_size as f64).powi(2) / (8192.0_f64).powi(2);
-        sum += (self.embedding_dim as f64 - other.embedding_dim as f64).powi(2) / (2048.0_f64).powi(2);
+        sum +=
+            (self.context_size as f64 - other.context_size as f64).powi(2) / (8192.0_f64).powi(2);
+        sum +=
+            (self.embedding_dim as f64 - other.embedding_dim as f64).powi(2) / (2048.0_f64).powi(2);
         sum += (self.beam_width as f64 - other.beam_width as f64).powi(2) / 100.0;
         sum += (self.top_k as f64 - other.top_k as f64).powi(2) / (200.0_f64).powi(2);
         sum += (self.top_p - other.top_p).powi(2);
         sum += (self.repeat_penalty - other.repeat_penalty).powi(2) / 4.0;
-        sum += if self.use_mixed_precision == other.use_mixed_precision { 0.0 } else { 1.0 };
+        sum += if self.use_mixed_precision == other.use_mixed_precision {
+            0.0
+        } else {
+            1.0
+        };
         sum += (self.l2_lambda - other.l2_lambda).powi(2) / 0.01;
-        sum += (self.early_stop_patience as f64 - other.early_stop_patience as f64).powi(2) / (50.0_f64).powi(2);
+        sum += (self.early_stop_patience as f64 - other.early_stop_patience as f64).powi(2)
+            / (50.0_f64).powi(2);
         sum += (self.lr_decay - other.lr_decay).powi(2) / 0.7921;
         sum.sqrt()
     }
@@ -411,7 +418,9 @@ impl SelfEvolver {
         let mut rng_state = hasher.finish();
 
         let mut next_f64 = || -> f64 {
-            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng_state = rng_state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (rng_state >> 11) as f64 / (1u64 << 53) as f64
         };
 
@@ -449,7 +458,8 @@ impl SelfEvolver {
             genome.l2_lambda *= 1.0 + (next_f64() - 0.5) * 4.0 * rate;
         }
         if next_f64() < 0.3 {
-            genome.lr_decay = (genome.lr_decay + (next_f64() - 0.5) * 2.0 * rate * 0.05).clamp(0.1, 0.99);
+            genome.lr_decay =
+                (genome.lr_decay + (next_f64() - 0.5) * 2.0 * rate * 0.05).clamp(0.1, 0.99);
         }
 
         // Mutate u32 fields with discrete jumps
@@ -487,7 +497,8 @@ impl SelfEvolver {
         }
         if next_f64() < 0.3 {
             let delta = (next_f64() * rate * 5.0) as i32;
-            genome.early_stop_patience = ((genome.early_stop_patience as i32 + delta).clamp(1, 50)) as u32;
+            genome.early_stop_patience =
+                ((genome.early_stop_patience as i32 + delta).clamp(1, 50)) as u32;
         }
         if next_f64() < 0.3 {
             genome.use_mixed_precision = !genome.use_mixed_precision;
@@ -499,12 +510,16 @@ impl SelfEvolver {
     /// Perform crossover between two parent genomes, producing a child.
     fn crossover(&self, parent_a: &Genome, parent_b: &Genome) -> Genome {
         let rng_seed = self.iteration_counter.load(Ordering::SeqCst);
-        let mut rng_state = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let mut rng_state = rng_seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
 
         /// Deterministic f64 in [0, 1) from a u32 seed by advancing an LCG.
         #[inline(always)]
         fn rand_f32(state: &mut u64) -> f64 {
-            *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            *state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (*state >> 11) as f64 / (1u64 << 53) as f64
         }
 
@@ -518,11 +533,19 @@ impl SelfEvolver {
         /// Pick one of two u32 values randomly
         #[inline(always)]
         fn pick_u32(a: u32, b: u32, state: &mut u64) -> u32 {
-            if rand_f32(state) < 0.5 { a } else { b }
+            if rand_f32(state) < 0.5 {
+                a
+            } else {
+                b
+            }
         }
 
         let mut child = Genome {
-            learning_rate: blend(parent_a.learning_rate, parent_b.learning_rate, &mut rng_state),
+            learning_rate: blend(
+                parent_a.learning_rate,
+                parent_b.learning_rate,
+                &mut rng_state,
+            ),
             batch_size: pick_u32(parent_a.batch_size, parent_b.batch_size, &mut rng_state),
             temperature: blend(parent_a.temperature, parent_b.temperature, &mut rng_state),
             num_layers: pick_u32(parent_a.num_layers, parent_b.num_layers, &mut rng_state),
@@ -533,14 +556,30 @@ impl SelfEvolver {
             grad_clip: blend(parent_a.grad_clip, parent_b.grad_clip, &mut rng_state),
             num_heads: pick_u32(parent_a.num_heads, parent_b.num_heads, &mut rng_state),
             context_size: pick_u32(parent_a.context_size, parent_b.context_size, &mut rng_state),
-            embedding_dim: pick_u32(parent_a.embedding_dim, parent_b.embedding_dim, &mut rng_state),
+            embedding_dim: pick_u32(
+                parent_a.embedding_dim,
+                parent_b.embedding_dim,
+                &mut rng_state,
+            ),
             beam_width: pick_u32(parent_a.beam_width, parent_b.beam_width, &mut rng_state),
             top_k: pick_u32(parent_a.top_k, parent_b.top_k, &mut rng_state),
             top_p: blend(parent_a.top_p, parent_b.top_p, &mut rng_state),
-            repeat_penalty: blend(parent_a.repeat_penalty, parent_b.repeat_penalty, &mut rng_state),
-            use_mixed_precision: if rand_f32(&mut rng_state) < 0.5 { parent_a.use_mixed_precision } else { parent_b.use_mixed_precision },
+            repeat_penalty: blend(
+                parent_a.repeat_penalty,
+                parent_b.repeat_penalty,
+                &mut rng_state,
+            ),
+            use_mixed_precision: if rand_f32(&mut rng_state) < 0.5 {
+                parent_a.use_mixed_precision
+            } else {
+                parent_b.use_mixed_precision
+            },
             l2_lambda: blend(parent_a.l2_lambda, parent_b.l2_lambda, &mut rng_state),
-            early_stop_patience: pick_u32(parent_a.early_stop_patience, parent_b.early_stop_patience, &mut rng_state),
+            early_stop_patience: pick_u32(
+                parent_a.early_stop_patience,
+                parent_b.early_stop_patience,
+                &mut rng_state,
+            ),
             lr_decay: blend(parent_a.lr_decay, parent_b.lr_decay, &mut rng_state),
         };
 
@@ -581,11 +620,15 @@ impl SelfEvolver {
 
         // Map convergence [0, 1] -> mutation rate [min, initial]
         let target_rate = self.config.min_mutation_rate
-            + (self.config.initial_mutation_rate - self.config.min_mutation_rate) * (1.0 - convergence);
+            + (self.config.initial_mutation_rate - self.config.min_mutation_rate)
+                * (1.0 - convergence);
 
         // Smooth transition
         self.mutation_rate = self.mutation_rate * 0.7 + target_rate * 0.3;
-        self.mutation_rate = self.mutation_rate.clamp(self.config.min_mutation_rate, self.config.initial_mutation_rate);
+        self.mutation_rate = self.mutation_rate.clamp(
+            self.config.min_mutation_rate,
+            self.config.initial_mutation_rate,
+        );
     }
 
     /// Track evolution history with lineage.
@@ -657,7 +700,11 @@ impl SelfEvolver {
                     count += 1;
                 }
             }
-            if count > 0 { avg_dist / count as f64 } else { 0.0 }
+            if count > 0 {
+                avg_dist / count as f64
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
@@ -665,8 +712,16 @@ impl SelfEvolver {
 
         // 2. Parents selection: pick top 2 from elite
         let elite = self.select_elite(self.config.elite_count.max(2));
-        let parent_a_ref = if elite.is_empty() { &self.current_genome } else { &elite[0].0 };
-        let parent_b_ref = if elite.len() > 1 { &elite[1].0 } else { parent_a_ref };
+        let parent_a_ref = if elite.is_empty() {
+            &self.current_genome
+        } else {
+            &elite[0].0
+        };
+        let parent_b_ref = if elite.len() > 1 {
+            &elite[1].0
+        } else {
+            parent_a_ref
+        };
         let parent_a = parent_a_ref.clone();
         let parent_b = parent_b_ref.clone();
         drop(elite);
@@ -694,8 +749,8 @@ impl SelfEvolver {
 
         // 5. Evaluate: use a simulated improvement (scaled by genome quality)
         //    In production, evolve_real() would be called with actual scores.
-        let raw_improvement = 0.01 * (1.0 + self.mutation_rate * 0.5)
-            + (iteration as f64 * 0.0005).min(0.05);
+        let raw_improvement =
+            0.01 * (1.0 + self.mutation_rate * 0.5) + (iteration as f64 * 0.0005).min(0.05);
         // Quality factor from genome parameters (normalized)
         let genome_quality = (child_genome.learning_rate * 10.0
             + child_genome.temperature * 0.5
@@ -710,7 +765,12 @@ impl SelfEvolver {
 
         // 6. Record lineage
         let child_id = if iteration > 0 {
-            self.record_lineage(self.current_genome_id, child_genome.clone(), new_score, origin)
+            self.record_lineage(
+                self.current_genome_id,
+                child_genome.clone(),
+                new_score,
+                origin,
+            )
         } else {
             self.current_genome_id
         };
@@ -719,9 +779,15 @@ impl SelfEvolver {
         let should_insert = if self.population.len() < self.config.population_size {
             true
         } else {
-            let worst_idx = self.population.iter()
+            let worst_idx = self
+                .population
+                .iter()
                 .enumerate()
-                .min_by(|a, b| a.1.1.partial_cmp(&b.1.1).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| {
+                    a.1 .1
+                        .partial_cmp(&b.1 .1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i);
             if let Some(idx) = worst_idx {
                 if new_score > self.population[idx].1 {
@@ -737,9 +803,15 @@ impl SelfEvolver {
         if should_insert {
             if self.population.len() >= self.config.population_size {
                 // Remove worst
-                let worst_idx = self.population.iter()
+                let worst_idx = self
+                    .population
+                    .iter()
                     .enumerate()
-                    .min_by(|a, b| a.1.1.partial_cmp(&b.1.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .min_by(|a, b| {
+                        a.1 .1
+                            .partial_cmp(&b.1 .1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
                     .map(|(i, _)| i)
                     .unwrap_or(0);
                 self.population.remove(worst_idx);
@@ -748,8 +820,16 @@ impl SelfEvolver {
         }
 
         // 8. Update current genome
-        self.current_genome = if success { child_genome.clone() } else { parent_a.clone() };
-        self.current_genome_id = if success { child_id } else { self.current_genome_id };
+        self.current_genome = if success {
+            child_genome.clone()
+        } else {
+            parent_a.clone()
+        };
+        self.current_genome_id = if success {
+            child_id
+        } else {
+            self.current_genome_id
+        };
 
         // 9. Track best
         let is_new_best = new_score > self.metrics.best_score;
@@ -786,20 +866,23 @@ impl SelfEvolver {
         self.metrics.score_history = self.score_history.clone();
 
         // 13. Convergence check
-        let converged = self.score_history.len() >= self.config.convergence_window
-            && {
-                let recent = &self.score_history[self.score_history.len() - self.config.convergence_window..];
-                let variance = {
-                    let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-                    recent.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / recent.len() as f64
-                };
-                variance < 1e-6
+        let converged = self.score_history.len() >= self.config.convergence_window && {
+            let recent =
+                &self.score_history[self.score_history.len() - self.config.convergence_window..];
+            let variance = {
+                let mean = recent.iter().sum::<f64>() / recent.len() as f64;
+                recent.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / recent.len() as f64
             };
+            variance < 1e-6
+        };
 
         // 14. Record snapshot
         let mut snapshot_metrics = HashMap::new();
         snapshot_metrics.insert("accuracy".to_string(), new_score);
-        snapshot_metrics.insert("efficiency".to_string(), 0.85 + (iteration as f64 * 0.001).min(0.1));
+        snapshot_metrics.insert(
+            "efficiency".to_string(),
+            0.85 + (iteration as f64 * 0.001).min(0.1),
+        );
         snapshot_metrics.insert("diversity".to_string(), diversity);
         snapshot_metrics.insert("mutation_rate".to_string(), self.mutation_rate);
         snapshot_metrics.insert("fitness".to_string(), fitness);
@@ -823,7 +906,11 @@ impl SelfEvolver {
             improvement: scaled_improvement,
             success,
             genome_id: Some(self.current_genome_id),
-            parent_genome_id: if iteration > 0 { Some(self.current_genome_id - 1) } else { None },
+            parent_genome_id: if iteration > 0 {
+                Some(self.current_genome_id - 1)
+            } else {
+                None
+            },
             operation: Some(origin.to_string()),
         };
 
@@ -835,7 +922,12 @@ impl SelfEvolver {
             duration_seconds: start.elapsed().as_secs(),
             message: format!(
                 "Evolution iteration {}: score {:.4} -> {:.4} (fit: {:.4}, rate: {:.3}, pop: {})",
-                iteration, old_score, new_score, fitness, self.mutation_rate, self.population.len()
+                iteration,
+                old_score,
+                new_score,
+                fitness,
+                self.mutation_rate,
+                self.population.len()
             ),
             rolled_back,
             converged,
@@ -863,8 +955,16 @@ impl SelfEvolver {
 
         // 1. Select elite parents
         let elite = self.select_elite(self.config.elite_count.max(2));
-        let parent_a_ref = if elite.is_empty() { &self.current_genome } else { &elite[0].0 };
-        let parent_b_ref = if elite.len() > 1 { &elite[1].0 } else { parent_a_ref };
+        let parent_a_ref = if elite.is_empty() {
+            &self.current_genome
+        } else {
+            &elite[0].0
+        };
+        let parent_b_ref = if elite.len() > 1 {
+            &elite[1].0
+        } else {
+            parent_a_ref
+        };
         let parent_a = parent_a_ref.clone();
         let parent_b = parent_b_ref.clone();
         drop(elite);
@@ -896,7 +996,12 @@ impl SelfEvolver {
 
         // 5. Record lineage
         let candidate_id = if iteration > 0 {
-            self.record_lineage(self.current_genome_id, candidate_genome.clone(), actual_performance, origin)
+            self.record_lineage(
+                self.current_genome_id,
+                candidate_genome.clone(),
+                actual_performance,
+                origin,
+            )
         } else {
             self.current_genome_id
         };
@@ -905,9 +1010,15 @@ impl SelfEvolver {
         let should_insert = if self.population.len() < self.config.population_size {
             true
         } else {
-            let worst_idx = self.population.iter()
+            let worst_idx = self
+                .population
+                .iter()
                 .enumerate()
-                .min_by(|a, b| a.1.1.partial_cmp(&b.1.1).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| {
+                    a.1 .1
+                        .partial_cmp(&b.1 .1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i);
             if let Some(idx) = worst_idx {
                 actual_performance > self.population[idx].1
@@ -918,14 +1029,21 @@ impl SelfEvolver {
 
         if should_insert {
             if self.population.len() >= self.config.population_size {
-                let worst_idx = self.population.iter()
+                let worst_idx = self
+                    .population
+                    .iter()
                     .enumerate()
-                    .min_by(|a, b| a.1.1.partial_cmp(&b.1.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .min_by(|a, b| {
+                        a.1 .1
+                            .partial_cmp(&b.1 .1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
                     .map(|(i, _)| i)
                     .unwrap_or(0);
                 self.population.remove(worst_idx);
             }
-            self.population.push((candidate_genome.clone(), actual_performance));
+            self.population
+                .push((candidate_genome.clone(), actual_performance));
         }
 
         // 7. Keep the change if score improves (A/B decision)
@@ -942,8 +1060,16 @@ impl SelfEvolver {
         let is_new_best = actual_performance > self.metrics.best_score;
         if is_new_best {
             self.metrics.best_score = actual_performance;
-            self.best_genome = if success { candidate_genome } else { parent_a.clone() };
-            self.best_genome_id = if success { candidate_id } else { self.current_genome_id };
+            self.best_genome = if success {
+                candidate_genome
+            } else {
+                parent_a.clone()
+            };
+            self.best_genome_id = if success {
+                candidate_id
+            } else {
+                self.current_genome_id
+            };
         }
 
         // 9. Update score history and adapt mutation rate
@@ -972,13 +1098,14 @@ impl SelfEvolver {
         self.metrics.score_history = self.score_history.clone();
 
         // 12. Convergence check
-        let converged = self.score_history.len() >= self.config.convergence_window
-            && {
-                let recent = &self.score_history[self.score_history.len() - self.config.convergence_window..];
-                let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-                let variance = recent.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / recent.len() as f64;
-                variance < 1e-6
-            };
+        let converged = self.score_history.len() >= self.config.convergence_window && {
+            let recent =
+                &self.score_history[self.score_history.len() - self.config.convergence_window..];
+            let mean = recent.iter().sum::<f64>() / recent.len() as f64;
+            let variance =
+                recent.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / recent.len() as f64;
+            variance < 1e-6
+        };
 
         // 13. Snapshot
         let mut snapshot_metrics = HashMap::new();
@@ -1009,7 +1136,11 @@ impl SelfEvolver {
             improvement: fitness,
             success,
             genome_id: Some(self.current_genome_id),
-            parent_genome_id: if iteration > 0 { Some(self.current_genome_id - 1) } else { None },
+            parent_genome_id: if iteration > 0 {
+                Some(self.current_genome_id - 1)
+            } else {
+                None
+            },
             operation: Some(origin.to_string()),
         };
 
@@ -1241,9 +1372,7 @@ impl SelfEvolver {
             self.consecutive_failures = failures as u32;
         }
         if let Some(hist) = state.get("score_history").and_then(|v| v.as_array()) {
-            self.score_history = hist.iter()
-                .filter_map(|v| v.as_f64())
-                .collect();
+            self.score_history = hist.iter().filter_map(|v| v.as_f64()).collect();
             self.metrics.score_history = self.score_history.clone();
         }
         Ok(())
@@ -1255,4 +1384,3 @@ impl Default for SelfEvolver {
         Self::new_with_defaults()
     }
 }
-

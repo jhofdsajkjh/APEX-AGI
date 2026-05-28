@@ -11,7 +11,10 @@ use tracing::{debug, info, warn};
 // ---------------------------------------------------------------------------
 
 enum LlmStep {
-    Action { name: String, args: serde_json::Value },
+    Action {
+        name: String,
+        args: serde_json::Value,
+    },
     Answer(String),
     ParseFailed(String),
 }
@@ -26,8 +29,8 @@ fn parse_step(text: &str) -> LlmStep {
     // Try Action + Action Input
     if let Some(name) = extract_tag(text, "Action:", None) {
         let args_raw = extract_tag(text, "Action Input:", Some("Action:")).unwrap_or("{}");
-        let args: serde_json::Value =
-            serde_json::from_str(args_raw.trim()).unwrap_or(serde_json::Value::Object(Default::default()));
+        let args: serde_json::Value = serde_json::from_str(args_raw.trim())
+            .unwrap_or(serde_json::Value::Object(Default::default()));
         return LlmStep::Action {
             name: name.trim().to_lowercase(),
             args,
@@ -133,7 +136,8 @@ impl ReActEngine {
                     match name.as_str() {
                         "think" | "reason" => {
                             // Internal thought — just log and continue
-                            let thought = args.get("thought")
+                            let thought = args
+                                .get("thought")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("...");
                             debug!("Internal thought: {}", thought);
@@ -187,5 +191,5 @@ impl ReActEngine {
 }
 
 // Re-export from tools module for backward compatibility
-pub use crate::tools::{tool_descriptions_prompt, ToolContext};
 pub use crate::tool::ToolResult;
+pub use crate::tools::{tool_descriptions_prompt, ToolContext};

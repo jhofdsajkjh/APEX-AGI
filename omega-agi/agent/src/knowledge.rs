@@ -74,8 +74,8 @@ pub struct KnowledgeConfig {
 impl Default for KnowledgeConfig {
     fn default() -> Self {
         Self {
-            chunk_size: 512,     // chars per chunk
-            chunk_overlap: 64,   // overlap between chunks
+            chunk_size: 512,   // chars per chunk
+            chunk_overlap: 64, // overlap between chunks
             max_chunks_per_doc: 100,
         }
     }
@@ -124,8 +124,17 @@ impl KnowledgeBase {
         let mut kw_index = self.keyword_index.write().await;
 
         for (i, chunk_text) in chunks.iter().enumerate() {
-            let id = format!("kb-{}-{}", source.chars().filter(|&c| c.is_alphanumeric()).take(16).collect::<String>(), i);
-            let emb = embeddings.as_ref()
+            let id = format!(
+                "kb-{}-{}",
+                source
+                    .chars()
+                    .filter(|&c| c.is_alphanumeric())
+                    .take(16)
+                    .collect::<String>(),
+                i
+            );
+            let emb = embeddings
+                .as_ref()
                 .and_then(|r| r.embeddings.get(i))
                 .map(|e| e.vector.clone());
 
@@ -186,9 +195,15 @@ impl KnowledgeBase {
                 || triple.predicate.to_lowercase().contains(&query_lower)
             {
                 let chunk = KnowledgeChunk {
-                    id: format!("graph-{}-{}-{}", triple.subject, triple.predicate, triple.object),
+                    id: format!(
+                        "graph-{}-{}-{}",
+                        triple.subject, triple.predicate, triple.object
+                    ),
                     source: triple.source.clone(),
-                    content: format!("{} → {} → {}", triple.subject, triple.predicate, triple.object),
+                    content: format!(
+                        "{} → {} → {}",
+                        triple.subject, triple.predicate, triple.object
+                    ),
                     embedding: None,
                     metadata: HashMap::new(),
                     created_at: chrono::Utc::now(),
@@ -227,7 +242,11 @@ impl KnowledgeBase {
         drop(chunks);
 
         // Deduplicate by chunk ID, keep highest score
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         let mut seen = std::collections::HashSet::new();
         results.retain(|r| seen.insert(r.chunk.id.clone()));
         results.truncate(top_k);
@@ -247,13 +266,23 @@ impl KnowledgeBase {
         // Use blocking spawn for sync code in async context
         let graph = self.graph.blocking_write();
         // Deduplicate
-        if !graph.iter().any(|t| t.subject == triple.subject && t.predicate == triple.predicate && t.object == triple.object) {
+        if !graph.iter().any(|t| {
+            t.subject == triple.subject
+                && t.predicate == triple.predicate
+                && t.object == triple.object
+        }) {
             // TODO: use blocking_write
         }
     }
 
     /// Add a document and auto-chunk it.
-    pub async fn add_document(&self, title: &str, content: &str, source: &str, content_type: &str) -> anyhow::Result<String> {
+    pub async fn add_document(
+        &self,
+        title: &str,
+        content: &str,
+        source: &str,
+        content_type: &str,
+    ) -> anyhow::Result<String> {
         let doc_id = format!("doc-{}", chrono::Utc::now().timestamp_nanos());
         let chunk_ids = self.learn(&doc_id, content).await?;
 
@@ -274,8 +303,13 @@ impl KnowledgeBase {
     /// Search for documents by title.
     pub async fn search_documents(&self, query: &str) -> Vec<Document> {
         let q = query.to_lowercase();
-        self.documents.read().await.iter()
-            .filter(|d| d.title.to_lowercase().contains(&q) || d.content.to_lowercase().contains(&q))
+        self.documents
+            .read()
+            .await
+            .iter()
+            .filter(|d| {
+                d.title.to_lowercase().contains(&q) || d.content.to_lowercase().contains(&q)
+            })
             .cloned()
             .collect()
     }
@@ -329,7 +363,11 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
     let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+    if norm_a == 0.0 || norm_b == 0.0 {
+        0.0
+    } else {
+        dot / (norm_a * norm_b)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +384,12 @@ mod tests {
         let embedder = Arc::new(MockEngine::new());
         let kb = KnowledgeBase::new(KnowledgeConfig::default(), embedder);
 
-        kb.learn("test", "Rust is a systems programming language focused on safety and performance.").await.unwrap();
+        kb.learn(
+            "test",
+            "Rust is a systems programming language focused on safety and performance.",
+        )
+        .await
+        .unwrap();
 
         let results = kb.recall("programming language", 5).await;
         assert!(!results.is_empty(), "Should find at least one result");
@@ -358,7 +401,14 @@ mod tests {
         let embedder = Arc::new(MockEngine::new());
         let kb = KnowledgeBase::new(KnowledgeConfig::default(), embedder);
 
-        kb.add_document("Rust Book", "Rust programming language introduction", "book", "text/markdown").await.unwrap();
+        kb.add_document(
+            "Rust Book",
+            "Rust programming language introduction",
+            "book",
+            "text/markdown",
+        )
+        .await
+        .unwrap();
         let docs = kb.search_documents("Rust").await;
         assert_eq!(docs.len(), 1);
         assert_eq!(docs[0].title, "Rust Book");
@@ -368,11 +418,16 @@ mod tests {
     fn test_chunking() {
         let embedder = MockEngine::new();
         let kb = KnowledgeBase::new(
-            KnowledgeConfig { chunk_size: 20, chunk_overlap: 5, max_chunks_per_doc: 10 },
+            KnowledgeConfig {
+                chunk_size: 20,
+                chunk_overlap: 5,
+                max_chunks_per_doc: 10,
+            },
             Arc::new(embedder),
         );
 
-        let text = "This is a longer text that should be split into multiple chunks for processing.";
+        let text =
+            "This is a longer text that should be split into multiple chunks for processing.";
         let chunks = kb.chunk_text(text);
         assert!(chunks.len() > 1, "Text should be split into chunks");
         assert!(chunks.iter().all(|c| c.len() <= 25)); // chunk_size + small slack

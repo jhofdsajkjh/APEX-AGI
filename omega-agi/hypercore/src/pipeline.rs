@@ -1,8 +1,8 @@
 //! # HyperCore Pipeline
 //! Pipeline orchestration for multi-stage data processing.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Result of a pipeline execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,7 +60,10 @@ impl PipelineOrchestrator {
             success: completed == total,
             stages_completed: completed,
             total_stages: total,
-            message: format!("Pipeline '{}' completed: {}/{} stages", self.name, completed, total),
+            message: format!(
+                "Pipeline '{}' completed: {}/{} stages",
+                self.name, completed, total
+            ),
         };
 
         self.results.insert(self.name.clone(), result.clone());
@@ -68,10 +71,13 @@ impl PipelineOrchestrator {
     }
 
     pub fn health_check(&self) -> Vec<HealthCheck> {
-        self.stages.iter().map(|stage| HealthCheck {
-            stage: stage.clone(),
-            healthy: true,
-            details: "Pipeline stage available".to_string(),
-        }).collect()
+        self.stages
+            .iter()
+            .map(|stage| HealthCheck {
+                stage: stage.clone(),
+                healthy: true,
+                details: "Pipeline stage available".to_string(),
+            })
+            .collect()
     }
 }

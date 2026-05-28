@@ -1,5 +1,5 @@
 //! OMEGA AGI - Feishu (Lark) Adapter
-//! 
+//!
 //! Adapter for integrating with Feishu/Lark messaging platform.
 //! Supports bot messaging, group management, and event handling.
 
@@ -133,7 +133,7 @@ impl<T> FeishuResponse<T> {
     pub fn is_success(&self) -> bool {
         self.code == 0
     }
-    
+
     pub fn into_result(self) -> Result<T> {
         if self.code == 0 {
             self.data.context("No data in successful response")
@@ -196,11 +196,9 @@ impl FeishuAdapter {
 
     /// Create from environment variables
     pub fn from_env() -> Result<Self> {
-        let app_id = std::env::var("FEISHU_APP_ID")
-            .context("FEISHU_APP_ID not set")?;
-        let app_secret = std::env::var("FEISHU_APP_SECRET")
-            .context("FEISHU_APP_SECRET not set")?;
-        
+        let app_id = std::env::var("FEISHU_APP_ID").context("FEISHU_APP_ID not set")?;
+        let app_secret = std::env::var("FEISHU_APP_SECRET").context("FEISHU_APP_SECRET not set")?;
+
         let config = FeishuConfig {
             app_id,
             app_secret,
@@ -208,10 +206,11 @@ impl FeishuAdapter {
             webhook_url: std::env::var("FEISHU_WEBHOOK_URL").ok(),
             enable_group_notifications: std::env::var("FEISHU_ENABLE_GROUP")
                 .unwrap_or_default()
-                .to_lowercase() == "true",
+                .to_lowercase()
+                == "true",
             notification_chat_id: std::env::var("FEISHU_NOTIFICATION_CHAT_ID").ok(),
         };
-        
+
         Ok(Self::new(config))
     }
 
@@ -229,13 +228,14 @@ impl FeishuAdapter {
 
         let config = self.config.read().await;
         let url = format!("{}/auth/v3/tenant_access_token/internal", FEISHU_BASE_URL);
-        
+
         let body = serde_json::json!({
             "app_id": config.app_id,
             "app_secret": config.app_secret
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .json(&body)
             .send()
@@ -266,7 +266,8 @@ impl FeishuAdapter {
             content: serde_json::json!({ "text": content }).to_string(),
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", token))
             .json(&body)
@@ -297,10 +298,12 @@ impl FeishuAdapter {
                     "title": title,
                     "content": post_content
                 }
-            }).to_string(),
+            })
+            .to_string(),
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", token))
             .json(&body)
@@ -324,7 +327,8 @@ impl FeishuAdapter {
             "content": card_json
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", token))
             .json(&body)
@@ -347,7 +351,8 @@ impl FeishuAdapter {
             "content": serde_json::json!({ "text": content })
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", token))
             .json(&body)
@@ -362,14 +367,13 @@ impl FeishuAdapter {
 
     /// Parse incoming event
     pub fn parse_event(&self, body: &[u8]) -> Result<FeishuEvent> {
-        serde_json::from_slice(body)
-            .context("Failed to parse Feishu event")
+        serde_json::from_slice(body).context("Failed to parse Feishu event")
     }
 
     /// Extract text content from message event
     pub fn extract_text(&self, event: &FeishuEvent) -> Option<String> {
         let message = event.event.as_ref()?.message.as_ref()?;
-        
+
         if message.message_type == MessageType::Text {
             let content: serde_json::Value = serde_json::from_str(&message.content).ok()?;
             content.get("text")?.as_str().map(String::from)
@@ -416,7 +420,8 @@ impl FeishuAdapter {
                     ]
                 }
             ]
-        }).to_string()
+        })
+        .to_string()
     }
 
     /// Health check - verify API connectivity
@@ -449,10 +454,18 @@ mod tests {
 
     #[test]
     fn test_response_is_success() {
-        let success = FeishuResponse::<()>{ code: 0, msg: "success".to_string(), data: None };
+        let success = FeishuResponse::<()> {
+            code: 0,
+            msg: "success".to_string(),
+            data: None,
+        };
         assert!(success.is_success());
-        
-        let failure = FeishuResponse::<()>{ code: 99991422, msg: "error".to_string(), data: None };
+
+        let failure = FeishuResponse::<()> {
+            code: 99991422,
+            msg: "error".to_string(),
+            data: None,
+        };
         assert!(!failure.is_success());
     }
 }

@@ -1,9 +1,9 @@
 //! # Engineering Quality Gates
 //! Multi-phase quality gate system with CMMI Level 5 rigor.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Result of a single quality gate check.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,10 +73,18 @@ impl BasicQualityGate {
 }
 
 impl QualityGate for BasicQualityGate {
-    fn name(&self) -> &str { &self.name }
-    fn phase(&self) -> u32 { self.phase }
-    fn severity(&self) -> &str { &self.severity }
-    fn description(&self) -> &str { &self.description }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn phase(&self) -> u32 {
+        self.phase
+    }
+    fn severity(&self) -> &str {
+        &self.severity
+    }
+    fn description(&self) -> &str {
+        &self.description
+    }
 
     fn check(&self, context: &GateContext) -> GateResult {
         let passed = (self.check_fn)(context);
@@ -111,17 +119,20 @@ impl QualityGateRunner {
     fn register_default_gates(&mut self) {
         // Phase 1: Planning gates
         self.register_gate(Box::new(BasicQualityGate::new(
-            "PlanCompletenessGate", 1, "blocking",
+            "PlanCompletenessGate",
+            1,
+            "blocking",
             "Every improvement must have all required fields",
-            Box::new(|ctx| {
-                ctx.metadata.contains_key("complete")
-            }),
+            Box::new(|ctx| ctx.metadata.contains_key("complete")),
         )));
         self.register_gate(Box::new(BasicQualityGate::new(
-            "PlanMinImprovementsGate", 1, "blocking",
+            "PlanMinImprovementsGate",
+            1,
+            "blocking",
             "Plan must contain at least 3 improvements",
             Box::new(|ctx| {
-                ctx.metadata.get("improvement_count")
+                ctx.metadata
+                    .get("improvement_count")
                     .and_then(|v| v.as_u64())
                     .map(|c| c >= 3)
                     .unwrap_or(false)
@@ -130,29 +141,39 @@ impl QualityGateRunner {
 
         // Phase 2: Execution gates
         self.register_gate(Box::new(BasicQualityGate::new(
-            "CompilationGate", 2, "blocking",
+            "CompilationGate",
+            2,
+            "blocking",
             "Code must compile without errors",
             Box::new(|_ctx| true),
         )));
         self.register_gate(Box::new(BasicQualityGate::new(
-            "RustTestGate", 2, "blocking",
+            "RustTestGate",
+            2,
+            "blocking",
             "All Rust tests must pass",
             Box::new(|_ctx| true),
         )));
         self.register_gate(Box::new(BasicQualityGate::new(
-            "PythonTestGate", 2, "blocking",
+            "PythonTestGate",
+            2,
+            "blocking",
             "All Python tests must pass",
             Box::new(|_ctx| true),
         )));
 
         // Phase 3: Audit gates
         self.register_gate(Box::new(BasicQualityGate::new(
-            "NoRegressionGate", 3, "blocking",
+            "NoRegressionGate",
+            3,
+            "blocking",
             "Performance must not regress",
             Box::new(|_ctx| true),
         )));
         self.register_gate(Box::new(BasicQualityGate::new(
-            "ImprovementGate", 3, "warning",
+            "ImprovementGate",
+            3,
+            "warning",
             "Metrics must show improvement",
             Box::new(|_ctx| true),
         )));
@@ -174,14 +195,20 @@ impl QualityGateRunner {
 
         let passed = results.iter().filter(|r| r.passed).count();
         let failed = results.len() - passed;
-        let blocking_failed = results.iter().any(|r| !r.passed && r.severity == "blocking");
+        let blocking_failed = results
+            .iter()
+            .any(|r| !r.passed && r.severity == "blocking");
 
         let summary = format!(
             "Phase {} Quality Gates: {}/{} passed{}",
             phase,
             passed,
             results.len(),
-            if blocking_failed { " (BLOCKING FAILURE)" } else { "" },
+            if blocking_failed {
+                " (BLOCKING FAILURE)"
+            } else {
+                ""
+            },
         );
 
         PhaseResult {
@@ -198,11 +225,15 @@ impl QualityGateRunner {
     pub fn run_all(&self, context: &GateContext) -> Vec<PhaseResult> {
         let mut phases: Vec<u32> = self.gates.keys().copied().collect();
         phases.sort();
-        phases.into_iter().map(|p| self.run_phase(p, context)).collect()
+        phases
+            .into_iter()
+            .map(|p| self.run_phase(p, context))
+            .collect()
     }
 
     pub fn get_gates_for_phase(&self, phase: u32) -> Vec<String> {
-        self.gates.get(&phase)
+        self.gates
+            .get(&phase)
             .map(|gates| gates.iter().map(|g| g.name().to_string()).collect())
             .unwrap_or_default()
     }

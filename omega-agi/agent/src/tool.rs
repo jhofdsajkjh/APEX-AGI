@@ -27,10 +27,18 @@ pub struct ToolResult {
 
 impl ToolResult {
     pub fn ok(tool_name: impl Into<String>, output: impl Into<String>) -> Self {
-        Self { success: true, tool_name: tool_name.into(), output: output.into() }
+        Self {
+            success: true,
+            tool_name: tool_name.into(),
+            output: output.into(),
+        }
     }
     pub fn err(tool_name: impl Into<String>, msg: impl Into<String>) -> Self {
-        Self { success: false, tool_name: tool_name.into(), output: msg.into() }
+        Self {
+            success: false,
+            tool_name: tool_name.into(),
+            output: msg.into(),
+        }
     }
 }
 
@@ -79,7 +87,9 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     pub fn new() -> Self {
-        Self { tools: HashMap::new() }
+        Self {
+            tools: HashMap::new(),
+        }
     }
 
     /// Register a tool (takes ownership).
@@ -98,7 +108,14 @@ impl ToolRegistry {
     pub async fn execute(&self, name: &str, args: &serde_json::Value) -> ToolResult {
         match self.tools.get(name) {
             Some(tool) => tool.execute(args).await,
-            None => ToolResult::err(name, format!("Unknown tool: '{}'. Available: {}", name, self.available_tools().join(", "))),
+            None => ToolResult::err(
+                name,
+                format!(
+                    "Unknown tool: '{}'. Available: {}",
+                    name,
+                    self.available_tools().join(", ")
+                ),
+            ),
         }
     }
 
@@ -118,11 +135,14 @@ impl ToolRegistry {
 
     /// Get all tool schemas.
     pub fn all_schemas(&self) -> Vec<ToolSchema> {
-        self.tools.values().map(|t| ToolSchema {
-            name: t.name().to_string(),
-            description: t.description().to_string(),
-            parameters: t.parameters(),
-        }).collect()
+        self.tools
+            .values()
+            .map(|t| ToolSchema {
+                name: t.name().to_string(),
+                description: t.description().to_string(),
+                parameters: t.parameters(),
+            })
+            .collect()
     }
 
     /// Generate the system prompt section for all tools.
@@ -195,9 +215,15 @@ impl FnTool {
 
 #[async_trait]
 impl Tool for FnTool {
-    fn name(&self) -> &str { &self.name }
-    fn description(&self) -> &str { &self.description }
-    fn parameters(&self) -> serde_json::Value { self.parameters.clone() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn description(&self) -> &str {
+        &self.description
+    }
+    fn parameters(&self) -> serde_json::Value {
+        self.parameters.clone()
+    }
 
     async fn execute(&self, args: &serde_json::Value) -> ToolResult {
         (self.execute_fn)(args)
@@ -222,8 +248,12 @@ pub struct ThinkTool;
 
 #[async_trait]
 impl Tool for ThinkTool {
-    fn name(&self) -> &str { "think" }
-    fn description(&self) -> &str { "Use this for internal reasoning. The output is not shown to the user." }
+    fn name(&self) -> &str {
+        "think"
+    }
+    fn description(&self) -> &str {
+        "Use this for internal reasoning. The output is not shown to the user."
+    }
     fn parameters(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
@@ -235,11 +265,19 @@ impl Tool for ThinkTool {
     }
 
     async fn execute(&self, args: &serde_json::Value) -> ToolResult {
-        let thought = args.get("thought").and_then(|v| v.as_str()).unwrap_or("...");
-        ToolResult::ok("think", format!("Thought recorded ({} chars)", thought.len()))
+        let thought = args
+            .get("thought")
+            .and_then(|v| v.as_str())
+            .unwrap_or("...");
+        ToolResult::ok(
+            "think",
+            format!("Thought recorded ({} chars)", thought.len()),
+        )
     }
 
-    fn box_clone(&self) -> Box<dyn Tool> { Box::new(ThinkTool) }
+    fn box_clone(&self) -> Box<dyn Tool> {
+        Box::new(ThinkTool)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -255,14 +293,18 @@ mod tests {
         let mut registry = ToolRegistry::new();
         registry.register(Box::new(ThinkTool));
 
-        let result = registry.execute("think", &serde_json::json!({"thought": "hello"})).await;
+        let result = registry
+            .execute("think", &serde_json::json!({"thought": "hello"}))
+            .await;
         assert!(result.success);
     }
 
     #[tokio::test]
     async fn test_tool_registry_unknown_tool() {
         let registry = ToolRegistry::new();
-        let result = registry.execute("nonexistent", &serde_json::json!({})).await;
+        let result = registry
+            .execute("nonexistent", &serde_json::json!({}))
+            .await;
         assert!(!result.success);
         assert!(result.output.contains("Unknown tool"));
     }

@@ -4,8 +4,8 @@
 //! Uses the sysinfo crate for real system metrics.
 
 use std::sync::{Arc, Mutex};
-use tokio::sync::RwLock;
 use sysinfo::{Disks, Networks, System, MINIMUM_CPU_UPDATE_INTERVAL};
+use tokio::sync::RwLock;
 
 /// A resource sample at a point in time
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -51,7 +51,11 @@ impl ResourceMonitor {
             sample.cpu_percent,
             sample.memory_mb,
             sample.disk_gb,
-            if sample.network_active { "active" } else { "idle" },
+            if sample.network_active {
+                "active"
+            } else {
+                "idle"
+            },
         )
     }
 
@@ -79,7 +83,12 @@ impl ResourceMonitor {
 
         // Disk — use Disks API directly
         let disks = Disks::new_with_refreshed_list();
-        let disk_gb: f64 = disks.list().iter().map(|d| d.total_space() as f64).sum::<f64>() / 1_000_000_000.0;
+        let disk_gb: f64 = disks
+            .list()
+            .iter()
+            .map(|d| d.total_space() as f64)
+            .sum::<f64>()
+            / 1_000_000_000.0;
 
         // Network — active if any interface exists (basic check)
         let networks = Networks::new_with_refreshed_list();

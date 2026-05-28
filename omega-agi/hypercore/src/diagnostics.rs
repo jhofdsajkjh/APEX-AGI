@@ -1,9 +1,9 @@
 //! # HyperCore Diagnostics
 //! System diagnostic engine for health analysis and reporting.
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Health status of a subsystem within a diagnostic report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,20 +35,27 @@ impl DiagnosticEngine {
     }
 
     pub fn register_subsystem(&mut self, name: &str) {
-        self.subsystems.insert(name.to_string(), "healthy".to_string());
+        self.subsystems
+            .insert(name.to_string(), "healthy".to_string());
     }
 
     pub fn run_diagnostics(&self) -> SystemHealthReport {
-        let subsystems: Vec<SubsystemHealth> = self.subsystems.iter().map(|(name, status)| {
-            SubsystemHealth {
+        let subsystems: Vec<SubsystemHealth> = self
+            .subsystems
+            .iter()
+            .map(|(name, status)| SubsystemHealth {
                 name: name.clone(),
                 status: status.clone(),
                 details: format!("Subsystem '{}' is {}", name, status),
-            }
-        }).collect();
+            })
+            .collect();
 
         let all_healthy = subsystems.iter().all(|s| s.status == "healthy");
-        let overall = if all_healthy { "healthy".to_string() } else { "degraded".to_string() };
+        let overall = if all_healthy {
+            "healthy".to_string()
+        } else {
+            "degraded".to_string()
+        };
 
         SystemHealthReport {
             timestamp: Utc::now(),

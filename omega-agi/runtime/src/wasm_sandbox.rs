@@ -228,12 +228,7 @@ impl WasmSandbox {
 
     /// Simulate executing a function in a WASM module.
     /// In a real implementation, this would invoke the WASM runtime.
-    pub fn execute(
-        &self,
-        module_name: &str,
-        function_name: &str,
-        input: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn execute(&self, module_name: &str, function_name: &str, input: &[u8]) -> Result<Vec<u8>> {
         let start = Instant::now();
 
         // Check module exists

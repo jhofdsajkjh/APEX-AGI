@@ -38,10 +38,12 @@ impl Default for OpenAIEngineConfig {
             api_key: std::env::var("OMEGA_API_KEY").unwrap_or_default(),
             model: std::env::var("OMEGA_MODEL_NAME").unwrap_or_else(|_| "gpt-4o".into()),
             max_tokens: std::env::var("OMEGA_MAX_TOKENS")
-                .ok().and_then(|v| v.parse().ok())
+                .ok()
+                .and_then(|v| v.parse().ok())
                 .unwrap_or(4096),
             temperature: std::env::var("OMEGA_TEMPERATURE")
-                .ok().and_then(|v| v.parse().ok())
+                .ok()
+                .and_then(|v| v.parse().ok())
                 .unwrap_or(0.7),
             embed_model: "text-embedding-3-small".into(),
         }
@@ -65,7 +67,9 @@ impl OpenAIEngine {
 
 #[async_trait]
 impl InferenceEngine for OpenAIEngine {
-    fn name(&self) -> &str { "openai" }
+    fn name(&self) -> &str {
+        "openai"
+    }
 
     async fn chat(&self, messages: &[Message]) -> anyhow::Result<ChatResponse> {
         let start = Instant::now();
@@ -78,8 +82,12 @@ impl InferenceEngine for OpenAIEngine {
             "temperature": self.config.temperature,
         });
 
-        let url = format!("{}/chat/completions", self.config.api_url.trim_end_matches('/'));
-        let resp = self.client
+        let url = format!(
+            "{}/chat/completions",
+            self.config.api_url.trim_end_matches('/')
+        );
+        let resp = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&body)
@@ -102,7 +110,10 @@ impl InferenceEngine for OpenAIEngine {
 
         let usage = json["usage"].as_object().map(|u| TokenUsage {
             prompt_tokens: u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-            completion_tokens: u.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+            completion_tokens: u
+                .get("completion_tokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32,
             total_tokens: u.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
         });
 
@@ -123,7 +134,8 @@ impl InferenceEngine for OpenAIEngine {
         });
 
         let url = format!("{}/embeddings", self.config.api_url.trim_end_matches('/'));
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&body)
@@ -142,16 +154,18 @@ impl InferenceEngine for OpenAIEngine {
         let embeddings: Vec<Embedding> = json["data"]
             .as_array()
             .map(|arr| {
-                arr.iter().map(|item| {
-                    let vec: Vec<f32> = item["embedding"]
-                        .as_array()
-                        .map(|v| v.iter().map(|n| n.as_f64().unwrap_or(0.0) as f32).collect())
-                        .unwrap_or_default();
-                    Embedding {
-                        dimensions: vec.len(),
-                        vector: vec,
-                    }
-                }).collect()
+                arr.iter()
+                    .map(|item| {
+                        let vec: Vec<f32> = item["embedding"]
+                            .as_array()
+                            .map(|v| v.iter().map(|n| n.as_f64().unwrap_or(0.0) as f32).collect())
+                            .unwrap_or_default();
+                        Embedding {
+                            dimensions: vec.len(),
+                            vector: vec,
+                        }
+                    })
+                    .collect()
             })
             .unwrap_or_default();
 
@@ -163,10 +177,15 @@ impl InferenceEngine for OpenAIEngine {
     }
 
     fn max_context(&self) -> usize {
-        if self.config.model.contains("gpt-4") { 128000 }
-        else if self.config.model.contains("claude") { 200000 }
-        else if self.config.model.contains("deepseek") { 65536 }
-        else { 8192 }
+        if self.config.model.contains("gpt-4") {
+            128000
+        } else if self.config.model.contains("claude") {
+            200000
+        } else if self.config.model.contains("deepseek") {
+            65536
+        } else {
+            8192
+        }
     }
 
     fn box_clone(&self) -> Box<dyn InferenceEngine> {
@@ -215,7 +234,9 @@ impl Default for MockEngine {
 
 #[async_trait]
 impl InferenceEngine for MockEngine {
-    fn name(&self) -> &str { "mock" }
+    fn name(&self) -> &str {
+        "mock"
+    }
 
     async fn chat(&self, messages: &[Message]) -> anyhow::Result<ChatResponse> {
         // Simulate latency
@@ -228,7 +249,9 @@ impl InferenceEngine for MockEngine {
             resp
         } else {
             // Default mock: respond based on last user message
-            let user_msg = messages.iter().rev()
+            let user_msg = messages
+                .iter()
+                .rev()
                 .find(|m| m.role == "user")
                 .map(|m| m.content.as_str())
                 .unwrap_or("");
@@ -236,7 +259,8 @@ impl InferenceEngine for MockEngine {
             let lower = user_msg.to_lowercase();
             if lower.contains("health") || lower.contains("健康") || lower.contains("检查") {
                 "Thought: The user wants a health check. I'll use the health tool.\nAction: health\nAction Input: {}".to_string()
-            } else if lower.contains("code") || lower.contains("代码") || lower.contains("生成") {
+            } else if lower.contains("code") || lower.contains("代码") || lower.contains("生成")
+            {
                 "Thought: The user wants code generation.\nAnswer: I can generate code! What language would you like? (Rust/Python)".to_string()
             } else {
                 format!("Thought: I received: \"{}\". Let me check system health first.\nAction: health\nAction Input: {{}}", user_msg)
@@ -246,21 +270,32 @@ impl InferenceEngine for MockEngine {
         Ok(ChatResponse {
             content,
             model: "mock-model".into(),
-            usage: Some(TokenUsage { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 }),
+            usage: Some(TokenUsage {
+                prompt_tokens: 100,
+                completion_tokens: 50,
+                total_tokens: 150,
+            }),
             latency_ms: 10,
         })
     }
 
     async fn embed(&self, texts: &[&str]) -> anyhow::Result<EmbeddingResult> {
         // Return random-ish deterministic embeddings for testing
-        let embeddings: Vec<Embedding> = texts.iter().enumerate().map(|(i, _)| {
-            let dim = 384;
-            let seed = i as f32 * 0.1;
-            let vector: Vec<f32> = (0..dim).map(|j| {
-                ((seed + j as f32 * 0.01).sin() * 0.5 + 0.5) as f32
-            }).collect();
-            Embedding { dimensions: dim, vector }
-        }).collect();
+        let embeddings: Vec<Embedding> = texts
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                let dim = 384;
+                let seed = i as f32 * 0.1;
+                let vector: Vec<f32> = (0..dim)
+                    .map(|j| ((seed + j as f32 * 0.01).sin() * 0.5 + 0.5) as f32)
+                    .collect();
+                Embedding {
+                    dimensions: dim,
+                    vector,
+                }
+            })
+            .collect();
 
         Ok(EmbeddingResult {
             embeddings,
@@ -273,7 +308,9 @@ impl InferenceEngine for MockEngine {
         text.len() / 4 + 1
     }
 
-    fn max_context(&self) -> usize { 4096 }
+    fn max_context(&self) -> usize {
+        4096
+    }
 
     fn box_clone(&self) -> Box<dyn InferenceEngine> {
         Box::new(MockEngine {
@@ -318,7 +355,9 @@ impl RouterEngine {
         }
 
         // Fast / simple tasks → fast engine
-        if lower.len() < 50 && (lower.contains("hi") || lower.contains("hello") || lower.contains("help")) {
+        if lower.len() < 50
+            && (lower.contains("hi") || lower.contains("hello") || lower.contains("help"))
+        {
             return self.fast_engine.as_ref().unwrap_or(&self.default_engine);
         }
 
@@ -328,7 +367,9 @@ impl RouterEngine {
 
 #[async_trait]
 impl InferenceEngine for RouterEngine {
-    fn name(&self) -> &str { "router" }
+    fn name(&self) -> &str {
+        "router"
+    }
 
     async fn chat(&self, messages: &[Message]) -> anyhow::Result<ChatResponse> {
         let engine = self.select_engine(messages);
@@ -342,7 +383,9 @@ impl InferenceEngine for RouterEngine {
         }
     }
 
-    fn max_context(&self) -> usize { self.default_engine.max_context() }
+    fn max_context(&self) -> usize {
+        self.default_engine.max_context()
+    }
 
     fn box_clone(&self) -> Box<dyn InferenceEngine> {
         Box::new(RouterEngine {
@@ -372,7 +415,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_engine_with_custom_responses() {
-        let engine = MockEngine::with_responses(vec!["Answer: Hello!".into(), "Answer: World!".into()]);
+        let engine =
+            MockEngine::with_responses(vec!["Answer: Hello!".into(), "Answer: World!".into()]);
         let r1 = engine.chat(&[]).await.unwrap();
         let r2 = engine.chat(&[]).await.unwrap();
         assert_eq!(r1.content, "Answer: Hello!");

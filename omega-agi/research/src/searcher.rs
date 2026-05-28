@@ -46,7 +46,10 @@ impl Searcher {
             ("Rust Programming".into(), "Rust is a systems programming language focused on safety, speed, and concurrency. Its ownership model ensures memory safety without a garbage collector, making it ideal for high-performance AI systems.".into()),
         ]);
 
-        Self { search_depth, knowledge_base: kb }
+        Self {
+            search_depth,
+            knowledge_base: kb,
+        }
     }
 
     /// Search for sources on a topic
@@ -82,7 +85,11 @@ impl Searcher {
         }
 
         // Deduplicate and sort by relevance
-        sources.sort_by(|a, b| b.relevance.partial_cmp(&a.relevance).unwrap_or(std::cmp::Ordering::Equal));
+        sources.sort_by(|a, b| {
+            b.relevance
+                .partial_cmp(&a.relevance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         sources.truncate(self.search_depth * 5);
         sources
     }

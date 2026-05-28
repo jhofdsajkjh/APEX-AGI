@@ -63,7 +63,7 @@ impl Default for SessionConfig {
     fn default() -> Self {
         Self {
             max_duration: Duration::from_secs(3600), // 1 hour
-            idle_timeout: Duration::from_secs(300),   // 5 minutes
+            idle_timeout: Duration::from_secs(300),  // 5 minutes
             max_tasks: 1000,
             default_ring: SecurityRing::User,
             persistent: false,
@@ -141,7 +141,9 @@ impl Session {
             }
             SessionState::Suspended => Ok(()),
             SessionState::Terminated => anyhow::bail!("Cannot suspend a terminated session"),
-            SessionState::Created => anyhow::bail!("Cannot suspend a session that hasn't been activated"),
+            SessionState::Created => {
+                anyhow::bail!("Cannot suspend a session that hasn't been activated")
+            }
         }
     }
 
@@ -282,7 +284,12 @@ impl SessionManager {
     }
 
     /// Set session metadata
-    pub fn set_meta(&self, id: &str, key: impl Into<String>, value: impl Into<String>) -> Result<()> {
+    pub fn set_meta(
+        &self,
+        id: &str,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<()> {
         let mut session = self
             .sessions
             .get_mut(id)
@@ -381,10 +388,13 @@ mod tests {
 
     #[test]
     fn test_session_task_recording() {
-        let mut session = Session::new("test-3", SessionConfig {
-            max_tasks: 3,
-            ..Default::default()
-        });
+        let mut session = Session::new(
+            "test-3",
+            SessionConfig {
+                max_tasks: 3,
+                ..Default::default()
+            },
+        );
 
         session.record_task().unwrap();
         session.record_task().unwrap();
@@ -409,10 +419,13 @@ mod tests {
 
     #[test]
     fn test_session_idle_timeout() {
-        let mut session = Session::new("test-5", SessionConfig {
-            idle_timeout: Duration::from_millis(10),
-            ..Default::default()
-        });
+        let mut session = Session::new(
+            "test-5",
+            SessionConfig {
+                idle_timeout: Duration::from_millis(10),
+                ..Default::default()
+            },
+        );
         session.activate().unwrap();
         session.set_idle();
 

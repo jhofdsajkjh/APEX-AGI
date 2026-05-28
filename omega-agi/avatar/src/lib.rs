@@ -18,14 +18,14 @@
 
 pub mod character;
 pub mod chat;
-pub mod tui;
 pub mod display;
+pub mod tui;
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use character::{Character, CharacterId, EmotionalState};
 use chat::{ChatEngine, ChatMessage};
 use display::DisplayRenderer;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tui::TuiSession;
 
 /// Avatar configuration
@@ -85,11 +85,7 @@ impl AvatarEngine {
 
     pub fn with_config(config: AvatarConfig) -> Self {
         let character = Character::new(config.character_id);
-        let chat = ChatEngine::new(
-            character.name(),
-            config.max_history,
-            &config.system_prefix,
-        );
+        let chat = ChatEngine::new(character.name(), config.max_history, &config.system_prefix);
         Self {
             config: Arc::new(RwLock::new(config)),
             character: Arc::new(RwLock::new(character)),
@@ -196,7 +192,9 @@ impl AvatarEngine {
             message_count: history.len(),
             duration_secs: duration,
             emotional_trajectory: emotions.iter().rev().take(5).cloned().collect(),
-            last_message: history.last().map(|m| m.content[..100.min(m.content.len())].to_string()),
+            last_message: history
+                .last()
+                .map(|m| m.content[..100.min(m.content.len())].to_string()),
         }
     }
 

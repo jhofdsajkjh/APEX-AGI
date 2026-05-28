@@ -45,12 +45,14 @@ impl KnowledgeGraph {
         }
 
         // Add topic node
-        self.nodes.entry(topic.to_string()).or_insert_with(|| KnowledgeNode {
-            label: topic.to_string(),
-            node_type: NodeType::Topic,
-            connections: Vec::new(),
-            weight: 1.0,
-        });
+        self.nodes
+            .entry(topic.to_string())
+            .or_insert_with(|| KnowledgeNode {
+                label: topic.to_string(),
+                node_type: NodeType::Topic,
+                connections: Vec::new(),
+                weight: 1.0,
+            });
 
         // Connect sources to topic
         for source in sources {
@@ -62,22 +64,23 @@ impl KnowledgeGraph {
                 }
             }
 
-            self.nodes.entry(source_key.clone()).or_insert_with(|| KnowledgeNode {
-                label: source.title.clone(),
-                node_type: NodeType::Source,
-                connections: vec![topic.to_string()],
-                weight: 0.8,
-            });
+            self.nodes
+                .entry(source_key.clone())
+                .or_insert_with(|| KnowledgeNode {
+                    label: source.title.clone(),
+                    node_type: NodeType::Source,
+                    connections: vec![topic.to_string()],
+                    weight: 0.8,
+                });
         }
 
         // Extract and connect concepts
         for point in key_points {
-            let words: Vec<&str> = point
-                .split_whitespace()
-                .filter(|w| w.len() > 5)
-                .collect();
+            let words: Vec<&str> = point.split_whitespace().filter(|w| w.len() > 5).collect();
             for word in words {
-                let concept = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+                let concept = word
+                    .trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_lowercase();
                 if concept.len() < 4 {
                     continue;
                 }
@@ -88,12 +91,15 @@ impl KnowledgeGraph {
                     }
                     node.weight = (node.weight + 0.1).min(1.0);
                 } else {
-                    self.nodes.insert(concept.clone(), KnowledgeNode {
-                        label: concept.clone(),
-                        node_type: NodeType::Concept,
-                        connections: vec![topic.to_string()],
-                        weight: 0.3,
-                    });
+                    self.nodes.insert(
+                        concept.clone(),
+                        KnowledgeNode {
+                            label: concept.clone(),
+                            node_type: NodeType::Concept,
+                            connections: vec![topic.to_string()],
+                            weight: 0.3,
+                        },
+                    );
                 }
             }
         }
@@ -106,7 +112,9 @@ impl KnowledgeGraph {
         let mut new_insights = Vec::new();
 
         // Find concepts that connect multiple topics
-        let topics: HashSet<String> = self.nodes.iter()
+        let topics: HashSet<String> = self
+            .nodes
+            .iter()
             .filter(|(_, n)| n.node_type == NodeType::Topic)
             .map(|(k, _)| k.clone())
             .collect();
@@ -115,7 +123,8 @@ impl KnowledgeGraph {
             if node.node_type != NodeType::Concept {
                 continue;
             }
-            let connected_topics: Vec<&String> = node.connections
+            let connected_topics: Vec<&String> = node
+                .connections
                 .iter()
                 .filter(|c| topics.contains(c.as_str()))
                 .collect();
@@ -123,7 +132,11 @@ impl KnowledgeGraph {
                 let insight = format!(
                     "Cross-topic connection: '{}' links [{}]",
                     label,
-                    connected_topics.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join(", ")
+                    connected_topics
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<&str>>()
+                        .join(", ")
                 );
                 if !self.insights.contains(&insight) {
                     new_insights.push(insight);

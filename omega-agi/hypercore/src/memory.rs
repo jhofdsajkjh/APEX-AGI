@@ -56,8 +56,7 @@ impl MemoryHeader {
     }
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
-        let json_str = std::str::from_utf8(data)
-            .context("Header bytes are not valid UTF-8")?;
+        let json_str = std::str::from_utf8(data).context("Header bytes are not valid UTF-8")?;
         // Find the end of JSON (null terminator or end of data)
         let end = json_str.find('\0').unwrap_or(json_str.len());
         let header: MemoryHeader = serde_json::from_str(&json_str[..end])
@@ -221,7 +220,9 @@ impl MemoryPool {
 
     /// Persist all changes to disk
     pub fn persist(&self) -> Result<()> {
-        self.mmap.flush().context("Failed to flush memory pool to disk")?;
+        self.mmap
+            .flush()
+            .context("Failed to flush memory pool to disk")?;
         debug!("Memory pool persisted to disk");
         Ok(())
     }

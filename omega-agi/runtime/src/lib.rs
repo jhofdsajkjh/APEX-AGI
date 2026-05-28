@@ -7,16 +7,16 @@
 
 pub mod actor;
 pub mod effect;
-pub mod wasm_sandbox;
-pub mod ml_inference;
 pub mod graph_executor;
+pub mod ml_inference;
 pub mod swarm;
+pub mod wasm_sandbox;
 
 pub use actor::{Actor, ActorId, ActorRef, ActorSystem, Message};
 pub use effect::{Effect, EffectContext, EffectId, EffectResult, EffectSystem};
-pub use wasm_sandbox::{WasmError, WasmModule, WasmSandbox, WasmSandboxConfig};
-pub use ml_inference::{InferenceConfig, InferenceEngine, InferenceResult, ModelHandle};
 pub use graph_executor::{GraphExecutor, GraphExecutorError, NodeId, NodeResult, TaskGraph};
+pub use ml_inference::{InferenceConfig, InferenceEngine, InferenceResult, ModelHandle};
+pub use wasm_sandbox::{WasmError, WasmModule, WasmSandbox, WasmSandboxConfig};
 
 /// Runtime version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -41,5 +41,3 @@ impl Runtime {
         })
     }
 }
-
-

@@ -4,11 +4,11 @@
 //! Implements circuit breaker pattern, exponential backoff retries, health checks,
 //! failure classification, multiple recovery strategies, and full healing pipeline.
 
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Circuit Breaker
@@ -138,7 +138,12 @@ pub struct RetryPolicy {
 
 impl RetryPolicy {
     /// Create a new retry policy.
-    pub fn new(initial_delay_ms: u64, max_delay_ms: u64, multiplier: f64, max_retries: u32) -> Self {
+    pub fn new(
+        initial_delay_ms: u64,
+        max_delay_ms: u64,
+        multiplier: f64,
+        max_retries: u32,
+    ) -> Self {
         Self {
             initial_delay_ms,
             max_delay_ms,
@@ -359,7 +364,11 @@ impl RecoveryStrategy {
     pub fn execute(&self) -> HealingResult {
         let start = Instant::now();
         match self {
-            RecoveryStrategy::RestartWithBackoff { target, initial_delay_ms, max_delay_ms } => {
+            RecoveryStrategy::RestartWithBackoff {
+                target,
+                initial_delay_ms,
+                max_delay_ms,
+            } => {
                 let delay = (*initial_delay_ms as f64).min(*max_delay_ms as f64) as u64;
                 tracing::info!(target = %target, delay_ms = delay, "Restarting with backoff");
                 // Simulate restart: in production this would send a restart signal
@@ -371,7 +380,10 @@ impl RecoveryStrategy {
                     duration_ms: start.elapsed().as_millis() as u64,
                 }
             }
-            RecoveryStrategy::ScaleUp { target, additional_replicas } => {
+            RecoveryStrategy::ScaleUp {
+                target,
+                additional_replicas,
+            } => {
                 tracing::info!(target = %target, replicas = %additional_replicas, "Scaling up");
                 // In production this would call an orchestrator API
                 HealingResult {
@@ -409,7 +421,9 @@ impl RecoveryStrategy {
     /// Estimate the duration of this strategy (for planning).
     pub fn estimated_duration_ms(&self) -> u64 {
         match self {
-            RecoveryStrategy::RestartWithBackoff { initial_delay_ms, .. } => *initial_delay_ms,
+            RecoveryStrategy::RestartWithBackoff {
+                initial_delay_ms, ..
+            } => *initial_delay_ms,
             RecoveryStrategy::ScaleUp { .. } => 2000,
             RecoveryStrategy::ClearCache { .. } => 500,
             RecoveryStrategy::RollbackToLastGood { .. } => 5000,
@@ -490,7 +504,10 @@ pub fn diagnose(target: &str, issue: &str) -> HealingPlan {
             cache_key: None,
         });
     }
-    if issue_lower.contains("version") || issue_lower.contains("mismatch") || issue_lower.contains("corrupt") {
+    if issue_lower.contains("version")
+        || issue_lower.contains("mismatch")
+        || issue_lower.contains("corrupt")
+    {
         strategies.push(RecoveryStrategy::RollbackToLastGood {
             target: target.to_string(),
             version: None,
@@ -528,10 +545,7 @@ pub fn execute_plan(plan: &HealingPlan) -> HealingResult {
         tracing::debug!(strategy_index = i, "Applying strategy {:?}", strategy);
         let result = strategy.execute();
         if !result.success && i < plan.strategies.len() - 1 {
-            tracing::warn!(
-                strategy_index = i,
-                "Strategy failed, trying next"
-            );
+            tracing::warn!(strategy_index = i, "Strategy failed, trying next");
             continue;
         }
         if result.success {
@@ -573,7 +587,10 @@ pub fn verify_healing(target: &str, original_issue: &str) -> HealingResult {
         HealthStatus::Healthy => HealingResult {
             action: format!("verify({})", target),
             success: true,
-            message: format!("Health check passed for {} after '{}'", target, original_issue),
+            message: format!(
+                "Health check passed for {} after '{}'",
+                target, original_issue
+            ),
             duration_ms: start.elapsed().as_millis() as u64,
         },
         HealthStatus::Unhealthy { reason } => HealingResult {
@@ -816,7 +833,10 @@ impl SelfHealingController {
             healers: Vec::new(),
             events: Vec::new(),
             event_counter: AtomicU64::new(1),
-            circuit_breaker: CircuitBreaker::with_thresholds(failure_threshold, recovery_timeout_secs),
+            circuit_breaker: CircuitBreaker::with_thresholds(
+                failure_threshold,
+                recovery_timeout_secs,
+            ),
             retry_policy: RetryPolicy::new(initial_delay_ms, max_delay_ms, 2.0, max_retries),
         }
     }
@@ -979,11 +999,7 @@ impl SelfHealingController {
             success: final_result.success,
             details: format!(
                 "pipeline target={} issue={} pre_healthy={} duration={}ms msg={}",
-                target,
-                issue,
-                pre_healthy,
-                final_result.duration_ms,
-                final_result.message
+                target, issue, pre_healthy, final_result.duration_ms, final_result.message
             ),
         });
 
@@ -1000,9 +1016,7 @@ impl SelfHealingController {
         if !self.circuit_breaker.allow_request() {
             let msg = format!(
                 "Circuit breaker OPEN for '{}' ({} failures, threshold {})",
-                target,
-                self.circuit_breaker.failure_count,
-                self.circuit_breaker.failure_threshold
+                target, self.circuit_breaker.failure_count, self.circuit_breaker.failure_threshold
             );
             tracing::warn!("{}", msg);
             return HealingResult {
@@ -1038,7 +1052,9 @@ impl SelfHealingController {
                         success: true,
                         message: format!(
                             "Healed after {} retries (attempt {}). {}",
-                            attempt, attempt + 1, result.message
+                            attempt,
+                            attempt + 1,
+                            result.message
                         ),
                         duration_ms: start.elapsed().as_millis() as u64,
                     };
@@ -1067,10 +1083,7 @@ impl SelfHealingController {
                     return HealingResult {
                         action: "try_heal_with_retry".to_string(),
                         success: false,
-                        message: format!(
-                            "Permanent failure on '{}': {}",
-                            target, last_error
-                        ),
+                        message: format!("Permanent failure on '{}': {}", target, last_error),
                         duration_ms: start.elapsed().as_millis() as u64,
                     };
                 }
@@ -1090,9 +1103,7 @@ impl SelfHealingController {
             success: false,
             message: format!(
                 "All {} retries exhausted for '{}'. Last error: {}",
-                self.retry_policy.max_retries,
-                target,
-                last_error
+                self.retry_policy.max_retries, target, last_error
             ),
             duration_ms: start.elapsed().as_millis() as u64,
         }
@@ -1198,9 +1209,7 @@ mod tests {
     #[test]
     fn test_retry_executor_permanent_failure() {
         let policy = RetryPolicy::new(1, 10, 2.0, 3);
-        let perm = || -> Result<i32, String> {
-            Err("config error: invalid value".to_string())
-        };
+        let perm = || -> Result<i32, String> { Err("config error: invalid value".to_string()) };
         let mut exec = RetryExecutor::new(&policy);
         let result = exec.execute(perm, default_classify);
         assert!(result.is_err());
@@ -1209,10 +1218,22 @@ mod tests {
 
     #[test]
     fn test_failure_classification() {
-        assert_eq!(default_classify("connection timeout"), FailureClass::Transient);
-        assert_eq!(default_classify("rate limit exceeded"), FailureClass::Transient);
-        assert_eq!(default_classify("503 Service Unavailable"), FailureClass::Transient);
-        assert_eq!(default_classify("config error: bad value"), FailureClass::Permanent);
+        assert_eq!(
+            default_classify("connection timeout"),
+            FailureClass::Transient
+        );
+        assert_eq!(
+            default_classify("rate limit exceeded"),
+            FailureClass::Transient
+        );
+        assert_eq!(
+            default_classify("503 Service Unavailable"),
+            FailureClass::Transient
+        );
+        assert_eq!(
+            default_classify("config error: bad value"),
+            FailureClass::Permanent
+        );
         assert_eq!(default_classify("invalid state"), FailureClass::Permanent);
     }
 
@@ -1273,8 +1294,9 @@ mod tests {
         // Since threshold is 1 and diagnose_and_heal records failure,
         // the next call should be blocked
         let r2 = ctrl.diagnose_and_heal("svc", "whatever");
-        assert!(!r2.success || r2.message.contains("Circuit breaker")
-                || r2.message.contains("OPEN"));
+        assert!(
+            !r2.success || r2.message.contains("Circuit breaker") || r2.message.contains("OPEN")
+        );
     }
 
     #[test]
@@ -1331,4 +1353,3 @@ mod tests {
         }
     }
 }
-

@@ -1,5 +1,5 @@
 //! Swarm智能体群协调层 (Layer 2)
-//! 
+//!
 //! 超越特性:
 //! - 多Agent同时协作编码 (类似Google Docs)
 //! - 自动任务分解与分配
@@ -16,10 +16,10 @@ pub mod consensus;
 pub mod crdt;
 pub mod health_monitor;
 
-pub use agent_coordinator::{SwarmCoordinator, AgentHandle, SwarmTask};
+pub use agent_coordinator::{AgentHandle, SwarmCoordinator, SwarmTask};
 pub use consensus::{ConsensusEngine, Proposal, Vote};
-pub use crdt::{CrdtDoc, TextChange, CollaborativeText};
-pub use health_monitor::{HealthMonitor, AgentHealth};
+pub use crdt::{CollaborativeText, CrdtDoc, TextChange};
+pub use health_monitor::{AgentHealth, HealthMonitor};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

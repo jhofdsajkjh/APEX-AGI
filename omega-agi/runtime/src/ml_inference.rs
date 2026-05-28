@@ -4,12 +4,12 @@
 //! backpropagation training, model persistence, ensemble support, and
 //! feature normalization.
 
+use anyhow::{anyhow, Result};
+use parking_lot::RwLock;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
-use anyhow::{Result, anyhow};
-use rand::Rng;
 
 // ============================================================================
 // Activation Functions
@@ -274,7 +274,11 @@ impl Layer {
             _ => (1.0 / input_size as f32).sqrt(),
         };
         let weights: Vec<Vec<f32>> = (0..output_size)
-            .map(|_| (0..input_size).map(|_| rng.gen::<f32>() * 2.0 * scale - scale).collect())
+            .map(|_| {
+                (0..input_size)
+                    .map(|_| rng.gen::<f32>() * 2.0 * scale - scale)
+                    .collect()
+            })
             .collect();
         let biases = vec![0.0_f32; output_size];
         Self {
@@ -310,7 +314,11 @@ impl NeuralNetwork {
         );
         let mut layers = Vec::with_capacity(activations.len());
         for i in 0..activations.len() {
-            layers.push(Layer::new(layer_sizes[i], layer_sizes[i + 1], activations[i]));
+            layers.push(Layer::new(
+                layer_sizes[i],
+                layer_sizes[i + 1],
+                activations[i],
+            ));
         }
         Self {
             layers,
@@ -375,11 +383,7 @@ impl NeuralNetwork {
     }
 
     /// Compute gradients via backpropagation for one sample.
-    pub fn backpropagate(
-        &self,
-        input: &[f32],
-        target: &[f32],
-    ) -> Vec<(Vec<Vec<f32>>, Vec<f32>)> {
+    pub fn backpropagate(&self, input: &[f32], target: &[f32]) -> Vec<(Vec<Vec<f32>>, Vec<f32>)> {
         // Forward pass with cache
         let n_layers = self.layers.len();
         // Cache: a0, z1, a1, z2, a2, ...
@@ -392,7 +396,11 @@ impl NeuralNetwork {
         let delta_last: Vec<f32> = match self.layers[n_layers - 1].activation {
             Activation::Softmax => {
                 // For softmax + cross-entropy: delta = predicted - target
-                last_a.iter().zip(target.iter()).map(|(p, t)| p - t).collect()
+                last_a
+                    .iter()
+                    .zip(target.iter())
+                    .map(|(p, t)| p - t)
+                    .collect()
             }
             _ => {
                 // MSE: delta = (pred - target) * activation'(z)
@@ -416,7 +424,11 @@ impl NeuralNetwork {
 
             let w_next_t = transpose(w_next);
             let delta_l = matvecmul(&w_next_t, &deltas[0]);
-            let delta_l: Vec<f32> = delta_l.iter().zip(dz.iter()).map(|(d, dz)| d * dz).collect();
+            let delta_l: Vec<f32> = delta_l
+                .iter()
+                .zip(dz.iter())
+                .map(|(d, dz)| d * dz)
+                .collect();
             deltas.insert(0, delta_l);
         }
 
@@ -570,7 +582,11 @@ impl NeuralNetwork {
 
         for (input, target) in inputs.iter().zip(targets.iter()) {
             let pred = self.predict(input);
-            let pred_class: f32 = if pred[0] >= positive_threshold { 1.0 } else { 0.0 };
+            let pred_class: f32 = if pred[0] >= positive_threshold {
+                1.0
+            } else {
+                0.0
+            };
             let target_class: f32 = if target[0] >= 0.5 { 1.0 } else { 0.0 };
 
             if (pred_class - 1.0).abs() < 1e-6f32 && (target_class - 1.0).abs() < 1e-6f32 {
@@ -582,8 +598,16 @@ impl NeuralNetwork {
             }
         }
 
-        let precision = if tp + fp > 0 { tp as f32 / (tp + fp) as f32 } else { 0.0 };
-        let recall = if tp + fn_val > 0 { tp as f32 / (tp + fn_val) as f32 } else { 0.0 };
+        let precision = if tp + fp > 0 {
+            tp as f32 / (tp + fp) as f32
+        } else {
+            0.0
+        };
+        let recall = if tp + fn_val > 0 {
+            tp as f32 / (tp + fn_val) as f32
+        } else {
+            0.0
+        };
 
         (precision, recall)
     }
@@ -718,11 +742,7 @@ impl InferenceEngine {
         {
             let mut nets = self.networks.write();
             if !nets.contains_key(model_id) {
-                let nn = NeuralNetwork::new_default(
-                    self.config.max_batch_size.min(4),
-                    8,
-                    2,
-                );
+                let nn = NeuralNetwork::new_default(self.config.max_batch_size.min(4), 8, 2);
                 nets.insert(model_id.to_string(), nn);
             }
         }
@@ -737,7 +757,11 @@ impl InferenceEngine {
         let start = std::time::Instant::now();
 
         // Check model exists
-        let model = self.models.read().get(model_id).cloned()
+        let model = self
+            .models
+            .read()
+            .get(model_id)
+            .cloned()
             .ok_or_else(|| anyhow!("Model '{}' not loaded", model_id))?;
 
         // Parse input into a Vec<f32>
@@ -746,13 +770,18 @@ impl InferenceEngine {
         // Get the neural network and run forward pass
         let result_vec = {
             let nets = self.networks.read();
-            let net = nets.get(model_id)
+            let net = nets
+                .get(model_id)
                 .ok_or_else(|| anyhow!("No neural network for model '{}'", model_id))?;
             net.predict(&input_vec)
         };
 
         let confidence = result_vec.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let confidence = if confidence.is_finite() { Some(confidence) } else { None };
+        let confidence = if confidence.is_finite() {
+            Some(confidence)
+        } else {
+            None
+        };
 
         let output = serde_json::json!({
             "prediction": result_vec,
@@ -777,7 +806,8 @@ impl InferenceEngine {
         epochs: usize,
     ) -> Result<()> {
         let mut nets = self.networks.write();
-        let net = nets.get_mut(model_id)
+        let net = nets
+            .get_mut(model_id)
             .ok_or_else(|| anyhow!("No neural network for model '{}'", model_id))?;
         net.train(&inputs, &outputs, epochs)
     }
@@ -785,7 +815,8 @@ impl InferenceEngine {
     /// Online learning: update model with one sample.
     pub fn online_learn(&self, model_id: &str, input: &[f32], output: &[f32]) -> Result<f32> {
         let mut nets = self.networks.write();
-        let net = nets.get_mut(model_id)
+        let net = nets
+            .get_mut(model_id)
             .ok_or_else(|| anyhow!("No neural network for model '{}'", model_id))?;
         Ok(net.online_learn(input, output))
     }
@@ -793,7 +824,8 @@ impl InferenceEngine {
     /// Save a model's neural network to a JSON string.
     pub fn save_model_to_json(&self, model_id: &str) -> Result<String> {
         let nets = self.networks.read();
-        let net = nets.get(model_id)
+        let net = nets
+            .get(model_id)
             .ok_or_else(|| anyhow!("No neural network for model '{}'", model_id))?;
         net.save_model()
     }
@@ -822,15 +854,25 @@ impl InferenceEngine {
     /// Fit a MinMaxScaler on data for a given model.
     pub fn fit_scaler(&self, model_id: &str, data: &[Vec<f32>]) {
         let mut scalers = self.scalers.write();
-        let scaler = scalers.entry(model_id.to_string()).or_insert_with(MinMaxScaler::new);
+        let scaler = scalers
+            .entry(model_id.to_string())
+            .or_insert_with(MinMaxScaler::new);
         scaler.fit(data);
     }
 
     /// Predict with normalized input (transform via scaler first).
-    pub fn predict_normalized(&self, model_id: &str, input: serde_json::Value) -> Result<InferenceResult> {
+    pub fn predict_normalized(
+        &self,
+        model_id: &str,
+        input: serde_json::Value,
+    ) -> Result<InferenceResult> {
         let start = std::time::Instant::now();
 
-        let _model = self.models.read().get(model_id).cloned()
+        let _model = self
+            .models
+            .read()
+            .get(model_id)
+            .cloned()
             .ok_or_else(|| anyhow!("Model '{}' not loaded", model_id))?;
 
         let input_vec = json_to_f32_vec(&input)?;
@@ -847,13 +889,18 @@ impl InferenceEngine {
 
         let result_vec = {
             let nets = self.networks.read();
-            let net = nets.get(model_id)
+            let net = nets
+                .get(model_id)
                 .ok_or_else(|| anyhow!("No neural network for model '{}'", model_id))?;
             net.predict(&normalized)
         };
 
         let confidence = result_vec.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let confidence = if confidence.is_finite() { Some(confidence) } else { None };
+        let confidence = if confidence.is_finite() {
+            Some(confidence)
+        } else {
+            None
+        };
 
         let output = serde_json::json!({
             "prediction": result_vec,
@@ -905,7 +952,8 @@ impl InferenceEngine {
         targets: &[Vec<f32>],
     ) -> Result<HashMap<String, f32>> {
         let nets = self.networks.read();
-        let net = nets.get(model_id)
+        let net = nets
+            .get(model_id)
             .ok_or_else(|| anyhow!("No neural network for model '{}'", model_id))?;
 
         let mut metrics = HashMap::new();
@@ -948,15 +996,14 @@ impl Default for InferenceEngine {
 /// Accepts: JSON array of numbers, or object with "features" array, or number.
 fn json_to_f32_vec(value: &serde_json::Value) -> Result<Vec<f32>> {
     match value {
-        serde_json::Value::Array(arr) => {
-            arr.iter()
-                .map(|v| {
-                    v.as_f64()
-                        .map(|f| f as f32)
-                        .ok_or_else(|| anyhow!("Expected numeric value in array, got: {}", v))
-                })
-                .collect()
-        }
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .map(|v| {
+                v.as_f64()
+                    .map(|f| f as f32)
+                    .ok_or_else(|| anyhow!("Expected numeric value in array, got: {}", v))
+            })
+            .collect(),
         serde_json::Value::Object(map) => {
             if let Some(features) = map.get("features").and_then(|v| v.as_array()) {
                 features
@@ -968,13 +1015,15 @@ fn json_to_f32_vec(value: &serde_json::Value) -> Result<Vec<f32>> {
                     })
                     .collect()
             } else {
-                Err(anyhow!("Expected JSON array or object with 'features' field"))
+                Err(anyhow!(
+                    "Expected JSON array or object with 'features' field"
+                ))
             }
         }
-        serde_json::Value::Number(n) => {
-            n.as_f64().map(|f| vec![f as f32])
-                .ok_or_else(|| anyhow!("Invalid number: {}", n))
-        }
+        serde_json::Value::Number(n) => n
+            .as_f64()
+            .map(|f| vec![f as f32])
+            .ok_or_else(|| anyhow!("Invalid number: {}", n)),
         _ => Err(anyhow!("Expected JSON array or object, got: {}", value)),
     }
 }

@@ -271,8 +271,7 @@ fn feeling_function(fitness_history: &[f64], beta: f64, gamma: f64) -> f64 {
 
     // 瞬时变化
     let instant_delta = if fitness_history.len() >= 2 {
-        fitness_history[fitness_history.len() - 1]
-            - fitness_history[fitness_history.len() - 2]
+        fitness_history[fitness_history.len() - 1] - fitness_history[fitness_history.len() - 2]
     } else {
         0.0
     };
@@ -338,12 +337,7 @@ fn time_limit(fitness_history: &[f64], window: usize, tolerance: f64) -> f64 {
         return 0.0; // 数据不足，未收敛
     }
 
-    let recent: Vec<f64> = fitness_history
-        .iter()
-        .rev()
-        .take(window)
-        .cloned()
-        .collect();
+    let recent: Vec<f64> = fitness_history.iter().rev().take(window).cloned().collect();
 
     let older: Vec<f64> = fitness_history
         .iter()
@@ -395,14 +389,7 @@ pub fn compute_apex(input: &ApexInput) -> ApexState {
     };
     let c_aware = awareness_coefficient(fitness_delta, input.temperature.max(0.1));
     let phi_feel = feeling_function(&input.fitness_history, 0.3, 0.7);
-    let gamma_awake = wakefulness(
-        input.population_diversity,
-        es,
-        tau,
-        1000,
-        1.5,
-        0.5,
-    );
+    let gamma_awake = wakefulness(input.population_diversity, es, tau, 1000, 1.5, 0.5);
 
     // — 围道积分 + 时间极限 —
     let contour = contour_integral(&input.fitness_history, |i| time_evolution(i, 0.05));
@@ -470,7 +457,12 @@ impl ApexState {
     /// 近似的围道积分值 (从最终结果反推)
     fn contour_integral_approx(&self) -> f64 {
         if self.apex_value.abs() > 1e-12 && self.sum_fused.abs() > 1e-12 {
-            self.apex_value / (self.sum_fused * self.awareness_coef * (1.0 + self.feeling * 0.3) * self.wakefulness + 1e-10)
+            self.apex_value
+                / (self.sum_fused
+                    * self.awareness_coef
+                    * (1.0 + self.feeling * 0.3)
+                    * self.wakefulness
+                    + 1e-10)
         } else {
             0.0
         }
@@ -586,18 +578,14 @@ mod tests {
 
     #[test]
     fn test_base_gradient_no_history() {
-        let input = ApexInput::new(
-            1, 0.7, 0.9, vec![], 0.5, 10, 0.001, 0.7, 0.3,
-        );
+        let input = ApexInput::new(1, 0.7, 0.9, vec![], 0.5, 10, 0.001, 0.7, 0.3);
         let g = base_gradient(&input);
         assert!((g - 0.2).abs() < 0.01, "Expected ~0.2, got {}", g);
     }
 
     #[test]
     fn test_base_gradient_with_history() {
-        let input = ApexInput::new(
-            3, 0.8, 0.9, vec![0.5, 0.6, 0.8], 0.5, 10, 0.001, 0.7, 0.3,
-        );
+        let input = ApexInput::new(3, 0.8, 0.9, vec![0.5, 0.6, 0.8], 0.5, 10, 0.001, 0.7, 0.3);
         let g = base_gradient(&input);
         // (0.8 - 0.6) / 0.6 = 0.333
         assert!((g - 0.333).abs() < 0.01, "Expected ~0.333, got {}", g);
@@ -680,7 +668,11 @@ mod tests {
         let history = vec![1.0, 1.0, 1.0];
         let integral = contour_integral(&history, |i| time_evolution(i, 0.05));
         // 恒定值 1.0 的积分应略小于 2 (因为 T_e 衰减)
-        assert!(integral > 1.0 && integral < 2.0, "Expected ~1.95, got {}", integral);
+        assert!(
+            integral > 1.0 && integral < 2.0,
+            "Expected ~1.95, got {}",
+            integral
+        );
     }
 
     #[test]
@@ -693,7 +685,9 @@ mod tests {
 
     #[test]
     fn test_time_limit_converged() {
-        let history = vec![0.1, 0.3, 0.6, 0.9, 1.0, 1.01, 1.02, 1.01, 1.02, 1.01, 1.02, 1.01];
+        let history = vec![
+            0.1, 0.3, 0.6, 0.9, 1.0, 1.01, 1.02, 1.01, 1.02, 1.01, 1.02, 1.01,
+        ];
         let conv = time_limit(&history, 5, 0.05);
         // 变化小 → 收敛
         assert!(conv > 0.5);
@@ -702,9 +696,7 @@ mod tests {
     #[test]
     fn test_compute_apex_full_pipeline() {
         let history = vec![0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.82, 0.84, 0.85];
-        let input = ApexInput::new(
-            10, 0.85, 0.9, history, 0.6, 20, 0.001, 0.7, 0.3,
-        );
+        let input = ApexInput::new(10, 0.85, 0.9, history, 0.6, 20, 0.001, 0.7, 0.3);
 
         let state = compute_apex(&input);
 
@@ -725,7 +717,15 @@ mod tests {
     #[test]
     fn test_apex_guidance() {
         let input = ApexInput::new(
-            5, 0.6, 0.9, vec![0.5, 0.55, 0.58, 0.6, 0.6], 0.2, 10, 0.001, 0.7, 0.3,
+            5,
+            0.6,
+            0.9,
+            vec![0.5, 0.55, 0.58, 0.6, 0.6],
+            0.2,
+            10,
+            0.001,
+            0.7,
+            0.3,
         );
         let state = compute_apex(&input);
         let guidance = apex_guidance(&state, &input);
@@ -738,9 +738,7 @@ mod tests {
 
     #[test]
     fn test_apex_json_output() {
-        let input = ApexInput::new(
-            1, 0.5, 0.5, vec![0.5], 0.5, 10, 0.001, 0.7, 0.3,
-        );
+        let input = ApexInput::new(1, 0.5, 0.5, vec![0.5], 0.5, 10, 0.001, 0.7, 0.3);
         let state = compute_apex(&input);
         let json = state.to_json();
         assert!(json.get("apex_value").is_some());

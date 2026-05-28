@@ -71,7 +71,12 @@ impl Optimizer {
 
         format!(
             "Optimization #{}: concurrency={}, batch={}, cache={}s, timeout={}ms (level={:.2})",
-            count, params.concurrency, params.batch_size, params.cache_ttl_secs, params.timeout_ms, *level
+            count,
+            params.concurrency,
+            params.batch_size,
+            params.cache_ttl_secs,
+            params.timeout_ms,
+            *level
         )
     }
 

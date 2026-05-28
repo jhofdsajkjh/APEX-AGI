@@ -111,7 +111,8 @@ impl FeedbackCollector {
             value: if passed { 1.0 } else { 0.0 },
             weight: 2.0,
             metadata: [("details".into(), details.to_string())].into(),
-        }).await;
+        })
+        .await;
     }
 
     /// Record a test result score (pass rate 0.0–1.0).
@@ -126,8 +127,10 @@ impl FeedbackCollector {
                 ("total".into(), total.to_string()),
                 ("passed".into(), passed.to_string()),
                 ("failed".into(), failed.to_string()),
-            ].into(),
-        }).await;
+            ]
+            .into(),
+        })
+        .await;
     }
 
     /// Record a runtime performance metric.
@@ -139,7 +142,8 @@ impl FeedbackCollector {
             value,
             weight: 1.0,
             metadata: HashMap::new(),
-        }).await;
+        })
+        .await;
     }
 
     /// Record a code quality score (0.0–1.0).
@@ -151,7 +155,8 @@ impl FeedbackCollector {
             value: quality,
             weight: 1.5,
             metadata: [("details".into(), details.to_string())].into(),
-        }).await;
+        })
+        .await;
     }
 
     /// Record a user feedback score (e.g., thumbs up/down).
@@ -163,7 +168,8 @@ impl FeedbackCollector {
             value: score,
             weight: 5.0, // User feedback is most important
             metadata: [("comment".into(), comment.to_string())].into(),
-        }).await;
+        })
+        .await;
     }
 
     /// Internal: add a score point and enforce max size.
@@ -178,9 +184,10 @@ impl FeedbackCollector {
     /// Generate a feedback report by aggregating recent scores.
     pub async fn generate_report(&self, cycle_id: &str) -> FeedbackReport {
         let scores = self.scores.read().await;
-        let recent: Vec<&ScorePoint> = scores.iter().filter(|s| {
-            s.timestamp > Utc::now() - chrono::Duration::hours(24)
-        }).collect();
+        let recent: Vec<&ScorePoint> = scores
+            .iter()
+            .filter(|s| s.timestamp > Utc::now() - chrono::Duration::hours(24))
+            .collect();
 
         if recent.is_empty() {
             return FeedbackReport {
@@ -198,18 +205,26 @@ impl FeedbackCollector {
         }
 
         // Aggregate by source
-        let compile_scores: Vec<f64> = recent.iter()
+        let compile_scores: Vec<f64> = recent
+            .iter()
             .filter(|s| s.source == ScoreSource::Compile)
-            .map(|s| s.value * s.weight).collect();
-        let test_scores: Vec<f64> = recent.iter()
+            .map(|s| s.value * s.weight)
+            .collect();
+        let test_scores: Vec<f64> = recent
+            .iter()
             .filter(|s| s.source == ScoreSource::Test)
-            .map(|s| s.value * s.weight).collect();
-        let quality_scores: Vec<f64> = recent.iter()
+            .map(|s| s.value * s.weight)
+            .collect();
+        let quality_scores: Vec<f64> = recent
+            .iter()
             .filter(|s| s.source == ScoreSource::Quality)
-            .map(|s| s.value * s.weight).collect();
-        let runtime_scores: Vec<f64> = recent.iter()
+            .map(|s| s.value * s.weight)
+            .collect();
+        let runtime_scores: Vec<f64> = recent
+            .iter()
             .filter(|s| s.source == ScoreSource::Runtime)
-            .map(|s| s.value * s.weight).collect();
+            .map(|s| s.value * s.weight)
+            .collect();
 
         let compile_avg = average(&compile_scores);
         let test_avg = average(&test_scores);
@@ -217,21 +232,38 @@ impl FeedbackCollector {
         let runtime_avg = average(&runtime_scores);
 
         // Weighted overall (test and compile matter most for self-evolution)
-        let overall = (compile_avg * 2.0 + test_avg * 3.0 + quality_avg * 1.5 + runtime_avg * 1.0) / 7.5;
+        let overall =
+            (compile_avg * 2.0 + test_avg * 3.0 + quality_avg * 1.5 + runtime_avg * 1.0) / 7.5;
 
         let summary = format!(
             "Compile: {:.1}% | Tests: {:.1}% | Quality: {:.1}% | Runtime: {:.1}%",
-            compile_avg * 100.0, test_avg * 100.0, quality_avg * 100.0, runtime_avg * 100.0,
+            compile_avg * 100.0,
+            test_avg * 100.0,
+            quality_avg * 100.0,
+            runtime_avg * 100.0,
         );
 
         // Generate recommendations
         let mut recommendations = Vec::new();
-        if compile_avg < 0.8 { recommendations.push("Improve compilation success rate — check recent code changes for syntax errors.".into()); }
-        if test_avg < 0.7 { recommendations.push("Increase test coverage and fix failing tests.".into()); }
-        if quality_avg < 0.6 { recommendations.push("Code quality needs attention — consider refactoring complex modules.".into()); }
+        if compile_avg < 0.8 {
+            recommendations.push(
+                "Improve compilation success rate — check recent code changes for syntax errors."
+                    .into(),
+            );
+        }
+        if test_avg < 0.7 {
+            recommendations.push("Increase test coverage and fix failing tests.".into());
+        }
+        if quality_avg < 0.6 {
+            recommendations.push(
+                "Code quality needs attention — consider refactoring complex modules.".into(),
+            );
+        }
 
         if recommendations.is_empty() {
-            recommendations.push("System is stable. Focus on performance optimization or new features.".into());
+            recommendations.push(
+                "System is stable. Focus on performance optimization or new features.".into(),
+            );
         }
 
         let num_changes = recent.len();
@@ -274,7 +306,11 @@ impl FeedbackCollector {
 }
 
 fn average(values: &[f64]) -> f64 {
-    if values.is_empty() { 0.0 } else { values.iter().sum::<f64>() / values.len() as f64 }
+    if values.is_empty() {
+        0.0
+    } else {
+        values.iter().sum::<f64>() / values.len() as f64
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -305,7 +341,9 @@ impl FeedbackIntegrator {
                 let fitness = r.overall_score;
                 let mut history = self.fitness_history.write().await;
                 history.push(fitness);
-                if history.len() > 50 { history.remove(0); }
+                if history.len() > 50 {
+                    history.remove(0);
+                }
                 fitness
             }
             None => 0.5, // Default mid-point fitness
@@ -315,10 +353,18 @@ impl FeedbackIntegrator {
     /// Check if the system has converged (fitness hasn't improved).
     pub async fn has_converged(&self, tolerance: f64, window: usize) -> bool {
         let history = self.fitness_history.read().await;
-        if history.len() < window * 2 { return false; }
+        if history.len() < window * 2 {
+            return false;
+        }
 
         let recent: Vec<f64> = history.iter().rev().take(window).cloned().collect();
-        let old: Vec<f64> = history.iter().rev().skip(window).take(window).cloned().collect();
+        let old: Vec<f64> = history
+            .iter()
+            .rev()
+            .skip(window)
+            .take(window)
+            .cloned()
+            .collect();
 
         let recent_avg = average(&recent);
         let old_avg = average(&old);

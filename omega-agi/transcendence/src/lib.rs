@@ -16,11 +16,11 @@
 //! └── SelfActualizer   (autonomous goal generation)
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
 /// Transcendence engine version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -220,7 +220,10 @@ impl TranscendenceEngine {
     }
 
     /// Discover emergent capabilities from cross-layer data
-    pub async fn discover_emergent(&self, layer_health: &HashMap<String, f64>) -> Vec<EmergentCapability> {
+    pub async fn discover_emergent(
+        &self,
+        layer_health: &HashMap<String, f64>,
+    ) -> Vec<EmergentCapability> {
         if !self.config.enable_emergent_discovery {
             return self.capabilities.read().await.clone();
         }
@@ -229,12 +232,16 @@ impl TranscendenceEngine {
         let mut new_discoveries = Vec::new();
 
         // Pattern 1: Evolution + Avatar synergy (self-improving personality)
-        if let (Some(&evo), Some(&ava)) = (layer_health.get("evolution"), layer_health.get("avatar")) {
-            if evo > 0.6 && ava > 0.6 && !capabilities.iter().any(|c| c.name == "evolving_persona") {
+        if let (Some(&evo), Some(&ava)) =
+            (layer_health.get("evolution"), layer_health.get("avatar"))
+        {
+            if evo > 0.6 && ava > 0.6 && !capabilities.iter().any(|c| c.name == "evolving_persona")
+            {
                 new_discoveries.push(EmergentCapability {
                     id: format!("emg_{}", chrono::Utc::now().timestamp_millis()),
                     name: "evolving_persona".to_string(),
-                    description: "Avatar personality evolves through evolutionary optimization".to_string(),
+                    description: "Avatar personality evolves through evolutionary optimization"
+                        .to_string(),
                     layers_involved: vec!["evolution".into(), "avatar".into()],
                     confidence: evo.min(ava),
                     discovered_at: chrono::Utc::now().to_rfc3339(),
@@ -244,12 +251,14 @@ impl TranscendenceEngine {
         }
 
         // Pattern 2: Research + Knowledge + Agent (deep research agent)
-        if let (Some(&res), Some(&agt)) = (layer_health.get("research"), layer_health.get("agent")) {
+        if let (Some(&res), Some(&agt)) = (layer_health.get("research"), layer_health.get("agent"))
+        {
             if res > 0.7 && agt > 0.5 && !capabilities.iter().any(|c| c.name == "deep_research") {
                 new_discoveries.push(EmergentCapability {
                     id: format!("emg_{}", chrono::Utc::now().timestamp_millis()),
                     name: "deep_research".to_string(),
-                    description: "Agent leverages research engine for autonomous deep research".to_string(),
+                    description: "Agent leverages research engine for autonomous deep research"
+                        .to_string(),
                     layers_involved: vec!["research".into(), "agent".into()],
                     confidence: (res + agt) / 2.0,
                     discovered_at: chrono::Utc::now().to_rfc3339(),
@@ -259,13 +268,23 @@ impl TranscendenceEngine {
         }
 
         // Pattern 3: LifeHarness + Superpowers (self-healing system)
-        if let (Some(&life), Some(&sp)) = (layer_health.get("life_harness"), layer_health.get("superpowers")) {
-            if life > 0.5 && sp > 0.5 && !capabilities.iter().any(|c| c.name == "autonomic_healing") {
+        if let (Some(&life), Some(&sp)) = (
+            layer_health.get("life_harness"),
+            layer_health.get("superpowers"),
+        ) {
+            if life > 0.5 && sp > 0.5 && !capabilities.iter().any(|c| c.name == "autonomic_healing")
+            {
                 new_discoveries.push(EmergentCapability {
                     id: format!("emg_{}", chrono::Utc::now().timestamp_millis()),
                     name: "autonomic_healing".to_string(),
-                    description: "System automatically detects and heals itself without human intervention".to_string(),
-                    layers_involved: vec!["life_harness".into(), "superpowers".into(), "hypercore".into()],
+                    description:
+                        "System automatically detects and heals itself without human intervention"
+                            .to_string(),
+                    layers_involved: vec![
+                        "life_harness".into(),
+                        "superpowers".into(),
+                        "hypercore".into(),
+                    ],
                     confidence: (life + sp) / 2.0,
                     discovered_at: chrono::Utc::now().to_rfc3339(),
                     active: true,
@@ -290,7 +309,9 @@ impl TranscendenceEngine {
             let new_goal = SelfGoal {
                 id: format!("goal_{}", now.timestamp_millis()),
                 title: "Improve cross-layer synergy".to_string(),
-                description: "Analyze all layers and suggest improvements to increase synergy score".to_string(),
+                description:
+                    "Analyze all layers and suggest improvements to increase synergy score"
+                        .to_string(),
                 priority: 1,
                 complexity: 0.8,
                 created_at: now.to_rfc3339(),
@@ -302,7 +323,8 @@ impl TranscendenceEngine {
                 let goal2 = SelfGoal {
                     id: format!("goal_{}", now.timestamp_millis() + 1),
                     title: "Discover new emergent capabilities".to_string(),
-                    description: "Run extended pattern analysis across all layer interactions".to_string(),
+                    description: "Run extended pattern analysis across all layer interactions"
+                        .to_string(),
                     priority: 2,
                     complexity: 0.6,
                     created_at: now.to_rfc3339(),
@@ -316,7 +338,10 @@ impl TranscendenceEngine {
     }
 
     /// Optimize configurations across layers (quantum-inspired)
-    pub async fn quantum_optimize(&self, layer_health: &HashMap<String, f64>) -> Vec<LayerConfigSuperposition> {
+    pub async fn quantum_optimize(
+        &self,
+        layer_health: &HashMap<String, f64>,
+    ) -> Vec<LayerConfigSuperposition> {
         if !self.config.enable_quantum_opt {
             return self.quantum_state.read().await.configurations.clone();
         }

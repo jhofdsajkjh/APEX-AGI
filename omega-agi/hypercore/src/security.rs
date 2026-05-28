@@ -54,7 +54,12 @@ pub struct Capability {
 
 impl Capability {
     /// Create a new capability
-    pub fn new(id: impl Into<String>, description: impl Into<String>, min_ring: SecurityRing, scope: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        description: impl Into<String>,
+        min_ring: SecurityRing,
+        scope: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             description: description.into(),
@@ -228,7 +233,12 @@ mod tests {
     use super::*;
 
     fn test_cap(id: &str, ring: SecurityRing) -> Capability {
-        Capability::new(id, format!("{} capability", id), ring, format!("test://{}", id))
+        Capability::new(
+            id,
+            format!("{} capability", id),
+            ring,
+            format!("test://{}", id),
+        )
     }
 
     #[test]
@@ -270,9 +280,24 @@ mod tests {
     #[test]
     fn test_capability_set_by_scope() {
         let mut set = CapabilitySet::new();
-        set.grant(Capability::new("a", "", SecurityRing::User, "memory://pool/main"));
-        set.grant(Capability::new("b", "", SecurityRing::User, "memory://pool/backup"));
-        set.grant(Capability::new("c", "", SecurityRing::User, "network://outbound"));
+        set.grant(Capability::new(
+            "a",
+            "",
+            SecurityRing::User,
+            "memory://pool/main",
+        ));
+        set.grant(Capability::new(
+            "b",
+            "",
+            SecurityRing::User,
+            "memory://pool/backup",
+        ));
+        set.grant(Capability::new(
+            "c",
+            "",
+            SecurityRing::User,
+            "network://outbound",
+        ));
 
         let memory_caps = set.by_scope("memory://");
         assert_eq!(memory_caps.len(), 2);
@@ -302,7 +327,8 @@ mod tests {
     fn test_security_context_can() {
         let mut ctx = SecurityContext::new("test", SecurityRing::User);
         ctx.capabilities.grant(test_cap("read", SecurityRing::User));
-        ctx.capabilities.grant(test_cap("admin", SecurityRing::Kernel));
+        ctx.capabilities
+            .grant(test_cap("admin", SecurityRing::Kernel));
 
         assert!(ctx.can("read"));
         assert!(!ctx.can("admin"));

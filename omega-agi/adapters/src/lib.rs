@@ -1,57 +1,32 @@
 //! OMEGA AGI - Adapters Module
-//! 
+//!
 //! Universal adapter layer for OMEGA AGI compatibility with multiple agent systems.
 //! This module provides adapters for OpenClaw, Hermes, and OpenHuman protocols.
 
-pub mod openclaw_adapter;
-pub mod hermes_adapter;
-pub mod openhuman_adapter;
 pub mod feishu_adapter;
+pub mod hermes_adapter;
+pub mod openclaw_adapter;
+pub mod openhuman_adapter;
 
 // Re-export commonly used types
 pub use openclaw_adapter::{
-    OpenClawAdapter,
-    OpenClawAdapterTrait,
-    OpenClawMessage,
-    OpenClawAgentMessage,
-    OpenClawSkill,
-    OpenClawSkillLoader,
-    OpenClawCard,
-    OpenClawCardElement,
-    AdapterInfo,
+    AdapterInfo, OpenClawAdapter, OpenClawAdapterTrait, OpenClawAgentMessage, OpenClawCard,
+    OpenClawCardElement, OpenClawMessage, OpenClawSkill, OpenClawSkillLoader,
 };
 
 pub use hermes_adapter::{
-    HermesAdapter,
-    HermesAdapterTrait,
-    HermesMessage,
-    HermesWorkflow,
-    HermesWorkflowStep,
-    HermesTask,
-    HermesApiClient,
-    HermesWorkflowEngine,
-    HermesAdapterInfo,
+    HermesAdapter, HermesAdapterInfo, HermesAdapterTrait, HermesApiClient, HermesMessage,
+    HermesTask, HermesWorkflow, HermesWorkflowEngine, HermesWorkflowStep,
 };
 
 pub use openhuman_adapter::{
-    OpenHumanAdapter,
-    OpenHumanAdapterTrait,
-    OpenHumanMessage,
-    OpenHumanAgent,
-    OpenHumanWorkflow,
-    OpenHumanWorkflowExecutor,
-    OpenHumanApiClient,
-    OpenHumanAdapterInfo,
+    OpenHumanAdapter, OpenHumanAdapterInfo, OpenHumanAdapterTrait, OpenHumanAgent,
+    OpenHumanApiClient, OpenHumanMessage, OpenHumanWorkflow, OpenHumanWorkflowExecutor,
 };
 
 pub use feishu_adapter::{
-    FeishuAdapter,
-    FeishuConfig,
-    FeishuEvent,
-    FeishuMessageContent,
-    FeishuResponse,
-    FeishuEventType,
-    MessageType,
+    FeishuAdapter, FeishuConfig, FeishuEvent, FeishuEventType, FeishuMessageContent,
+    FeishuResponse, MessageType,
 };
 
 use serde::{Deserialize, Serialize};
@@ -102,22 +77,18 @@ impl AdapterManager {
     /// Get active adapter info
     pub fn get_active_info(&self) -> AdapterInfo {
         match self.active_adapter.as_str() {
-            "hermes" => {
-                AdapterInfo {
-                    name: "Hermes Adapter".to_string(),
-                    version: env!("CARGO_PKG_VERSION").to_string(),
-                    protocol_version: "1.0".to_string(),
-                    capabilities: vec!["workflow_execution".to_string()],
-                }
-            }
-            "openhuman" => {
-                AdapterInfo {
-                    name: "OpenHuman Adapter".to_string(),
-                    version: env!("CARGO_PKG_VERSION").to_string(),
-                    protocol_version: "1.0".to_string(),
-                    capabilities: vec!["agent_communication".to_string()],
-                }
-            }
+            "hermes" => AdapterInfo {
+                name: "Hermes Adapter".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                protocol_version: "1.0".to_string(),
+                capabilities: vec!["workflow_execution".to_string()],
+            },
+            "openhuman" => AdapterInfo {
+                name: "OpenHuman Adapter".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                protocol_version: "1.0".to_string(),
+                capabilities: vec!["agent_communication".to_string()],
+            },
             _ => {
                 if let Some(ref o) = self.openclaw {
                     o.adapter_info()
@@ -184,12 +155,16 @@ impl ProtocolVersion {
 
 impl Default for ProtocolVersion {
     fn default() -> Self {
-        Self::new("OMEGA AGI", "1.0.0", vec![
-            "multi_protocol_support",
-            "workflow_execution",
-            "skill_loading",
-            "message_transform",
-        ])
+        Self::new(
+            "OMEGA AGI",
+            "1.0.0",
+            vec![
+                "multi_protocol_support",
+                "workflow_execution",
+                "skill_loading",
+                "message_transform",
+            ],
+        )
     }
 }
 
@@ -235,11 +210,7 @@ impl CompatibilityMatrix {
     }
 
     pub fn all() -> Vec<Self> {
-        vec![
-            Self::openclaw(),
-            Self::hermes(),
-            Self::openhuman(),
-        ]
+        vec![Self::openclaw(), Self::hermes(), Self::openhuman()]
     }
 }
 
@@ -248,16 +219,16 @@ impl CompatibilityMatrix {
 pub enum AdapterError {
     #[error("OpenClaw adapter error: {0}")]
     OpenClaw(String),
-    
+
     #[error("Hermes adapter error: {0}")]
     Hermes(String),
-    
+
     #[error("OpenHuman adapter error: {0}")]
     OpenHuman(String),
-    
+
     #[error("Protocol mismatch: expected {expected}, got {actual}")]
     ProtocolMismatch { expected: String, actual: String },
-    
+
     #[error("Adapter not available: {0}")]
     NotAvailable(String),
 }

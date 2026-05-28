@@ -17,16 +17,16 @@
 //! ```
 
 pub mod heartbeat;
+pub mod persistence;
 pub mod recovery;
 pub mod resources;
-pub mod persistence;
 
+use heartbeat::{HeartbeatMonitor, HeartbeatStatus};
+use persistence::SessionStore;
+use recovery::{RecoveryAction, RecoveryManager};
+use resources::ResourceMonitor;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use heartbeat::{HeartbeatMonitor, HeartbeatStatus};
-use recovery::{RecoveryManager, RecoveryAction};
-use resources::ResourceMonitor;
-use persistence::SessionStore;
 
 /// Life-Harness configuration
 #[derive(Debug, Clone)]
@@ -134,7 +134,10 @@ impl LifeHarness {
     pub async fn heartbeat(&self) -> HeartbeatStatus {
         let status = self.heartbeat.ping().await;
         if status.failures >= self.config.max_failures && self.config.auto_recovery {
-            let action = self.recovery.trigger("Heartbeat failure threshold reached").await;
+            let action = self
+                .recovery
+                .trigger("Heartbeat failure threshold reached")
+                .await;
             tracing::warn!("Recovery triggered: {:?}", action);
         }
         status

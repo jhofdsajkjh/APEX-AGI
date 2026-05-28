@@ -370,7 +370,9 @@ impl LongTermMemory {
                 continue;
             }
             let score = match &query_emb {
-                Some(qv) => entry.embedding.as_ref()
+                Some(qv) => entry
+                    .embedding
+                    .as_ref()
                     .map(|ev| cosine_similarity(qv, ev))
                     .unwrap_or(entry.importance),
                 None => entry.importance,
@@ -386,7 +388,9 @@ impl LongTermMemory {
                 continue;
             }
             let score = match &query_emb {
-                Some(qv) => entry.embedding.as_ref()
+                Some(qv) => entry
+                    .embedding
+                    .as_ref()
                     .map(|ev| cosine_similarity(qv, ev))
                     .unwrap_or(entry.importance * 0.8),
                 None => entry.importance * 0.8,
@@ -404,10 +408,14 @@ impl LongTermMemory {
     /// Simple filter check.
     fn matches_filters(&self, entry: &MemoryEntry, query: &MemoryQuery) -> bool {
         if let Some(ref mt) = query.memory_type {
-            if entry.memory_type != *mt { return false; }
+            if entry.memory_type != *mt {
+                return false;
+            }
         }
         if let Some(since) = query.since {
-            if entry.timestamp < since { return false; }
+            if entry.timestamp < since {
+                return false;
+            }
         }
         if !query.tags.is_empty() {
             if !query.tags.iter().all(|t| entry.tags.contains(t)) {
@@ -461,10 +469,10 @@ impl LongTermMemory {
                 if let Some(ref conn) = *db {
                     for entry in &entries_with_emb {
                         let tags_str = serde_json::to_string(&entry.tags).unwrap_or_default();
-                        let emb_blob = entry.embedding.as_ref()
-                            .map(|v| {
-                                v.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>()
-                            });
+                        let emb_blob = entry
+                            .embedding
+                            .as_ref()
+                            .map(|v| v.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>());
                         let mem_type_str = format!("{:?}", entry.memory_type).to_lowercase();
                         let _ = conn.execute(
                             "INSERT OR REPLACE INTO memories (id, timestamp, agent_id, memory_type, content, embedding, importance, access_count, tags, consolidated)
@@ -493,7 +501,11 @@ impl LongTermMemory {
         consolidated.append(&mut entries_with_emb);
         // Keep only top 10000
         if consolidated.len() > 10000 {
-            consolidated.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal));
+            consolidated.sort_by(|a, b| {
+                b.importance
+                    .partial_cmp(&a.importance)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             consolidated.truncate(10000);
         }
 
@@ -509,11 +521,13 @@ impl LongTermMemory {
     /// Get memories relevant to a context (hybrid search: recent + semantic).
     pub async fn context(&self, query: &str, n: usize) -> Vec<MemoryEntry> {
         let recent = self.recent(n / 2).await;
-        let semantic = self.search(&MemoryQuery {
-            query_text: query.to_string(),
-            top_k: n / 2 + n % 2,
-            ..Default::default()
-        }).await;
+        let semantic = self
+            .search(&MemoryQuery {
+                query_text: query.to_string(),
+                top_k: n / 2 + n % 2,
+                ..Default::default()
+            })
+            .await;
 
         // Merge: recent first, then semantic (avoid duplicates)
         let mut seen = std::collections::HashSet::new();
@@ -534,9 +548,21 @@ impl LongTermMemory {
 
         // Keywords that indicate high importance
         let high_impact = [
-            "error", "fail", "crash", "bug", "fix", "security", "vulnerability",
-            "performance", "optimization", "improvement", "critical",
-            "learn", "important", "breakthrough", "discover",
+            "error",
+            "fail",
+            "crash",
+            "bug",
+            "fix",
+            "security",
+            "vulnerability",
+            "performance",
+            "optimization",
+            "improvement",
+            "critical",
+            "learn",
+            "important",
+            "breakthrough",
+            "discover",
         ];
         for kw in &high_impact {
             if lower.contains(kw) {
@@ -564,10 +590,22 @@ impl LongTermMemory {
 
         MemoryStats {
             total_entries: all.len(),
-            episodic_count: all.iter().filter(|e| e.memory_type == MemoryType::Episodic).count(),
-            semantic_count: all.iter().filter(|e| e.memory_type == MemoryType::Semantic).count(),
-            procedural_count: all.iter().filter(|e| e.memory_type == MemoryType::Procedural).count(),
-            reflective_count: all.iter().filter(|e| e.memory_type == MemoryType::Reflective).count(),
+            episodic_count: all
+                .iter()
+                .filter(|e| e.memory_type == MemoryType::Episodic)
+                .count(),
+            semantic_count: all
+                .iter()
+                .filter(|e| e.memory_type == MemoryType::Semantic)
+                .count(),
+            procedural_count: all
+                .iter()
+                .filter(|e| e.memory_type == MemoryType::Procedural)
+                .count(),
+            reflective_count: all
+                .iter()
+                .filter(|e| e.memory_type == MemoryType::Reflective)
+                .count(),
             buffer_size: buf.len(),
             db_path: self.config.db_path.clone(),
         }
@@ -595,7 +633,11 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
     let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+    if norm_a == 0.0 || norm_b == 0.0 {
+        0.0
+    } else {
+        dot / (norm_a * norm_b)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -611,7 +653,10 @@ mod tests {
     async fn test_store_and_recall() {
         let embedder = Arc::new(MockEngine::new());
         let memory = LongTermMemory::new(
-            MemoryConfig { db_path: String::new(), ..Default::default() },
+            MemoryConfig {
+                db_path: String::new(),
+                ..Default::default()
+            },
             embedder,
             "test-agent",
         );
@@ -638,7 +683,9 @@ mod tests {
         );
 
         for i in 0..5 {
-            memory.store(format!("Entry {}", i), MemoryType::Episodic).await;
+            memory
+                .store(format!("Entry {}", i), MemoryType::Episodic)
+                .await;
         }
 
         let recent = memory.recent(10).await;
@@ -650,7 +697,10 @@ mod tests {
     async fn test_search_filter_by_type() {
         let embedder = Arc::new(MockEngine::new());
         let memory = LongTermMemory::new(
-            MemoryConfig { db_path: String::new(), ..Default::default() },
+            MemoryConfig {
+                db_path: String::new(),
+                ..Default::default()
+            },
             embedder,
             "test-agent",
         );
@@ -658,11 +708,13 @@ mod tests {
         memory.store("A fact", MemoryType::Semantic).await;
         memory.store("An event", MemoryType::Episodic).await;
 
-        let results = memory.search(&MemoryQuery {
-            memory_type: Some(MemoryType::Semantic),
-            top_k: 10,
-            ..Default::default()
-        }).await;
+        let results = memory
+            .search(&MemoryQuery {
+                memory_type: Some(MemoryType::Semantic),
+                top_k: 10,
+                ..Default::default()
+            })
+            .await;
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content, "A fact");
@@ -672,16 +724,33 @@ mod tests {
     async fn test_importance_estimation() {
         let embedder = Arc::new(MockEngine::new());
         let memory = LongTermMemory::new(
-            MemoryConfig { db_path: String::new(), ..Default::default() },
+            MemoryConfig {
+                db_path: String::new(),
+                ..Default::default()
+            },
             embedder,
             "test-agent",
         );
 
         // Error content should get higher importance
-        let id1 = memory.store_tagged("Critical error: system crash", MemoryType::Episodic, 0.9, vec!["error".into()]).await;
-        let id2 = memory.store_tagged("Routine log entry", MemoryType::Episodic, 0.2, vec![]).await;
+        let id1 = memory
+            .store_tagged(
+                "Critical error: system crash",
+                MemoryType::Episodic,
+                0.9,
+                vec!["error".into()],
+            )
+            .await;
+        let id2 = memory
+            .store_tagged("Routine log entry", MemoryType::Episodic, 0.2, vec![])
+            .await;
 
-        let results = memory.search(&MemoryQuery { top_k: 10, ..Default::default() }).await;
+        let results = memory
+            .search(&MemoryQuery {
+                top_k: 10,
+                ..Default::default()
+            })
+            .await;
         assert_eq!(results.len(), 2);
         // High importance first
         assert_eq!(results[0].id, id1);
@@ -691,13 +760,18 @@ mod tests {
     async fn test_context_hybrid() {
         let embedder = Arc::new(MockEngine::new());
         let memory = LongTermMemory::new(
-            MemoryConfig { db_path: String::new(), ..Default::default() },
+            MemoryConfig {
+                db_path: String::new(),
+                ..Default::default()
+            },
             embedder,
             "test-agent",
         );
 
         for i in 0..5 {
-            memory.store(format!("Recent item {}", i), MemoryType::Episodic).await;
+            memory
+                .store(format!("Recent item {}", i), MemoryType::Episodic)
+                .await;
         }
 
         let ctx = memory.context("test", 3).await;

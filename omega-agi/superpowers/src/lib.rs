@@ -16,17 +16,17 @@
 //! └── Analyzer   (system analysis + recs)
 //! ```
 
-pub mod optimizer;
-pub mod boost;
-pub mod self_heal;
 pub mod analyzer;
+pub mod boost;
+pub mod optimizer;
+pub mod self_heal;
 
+use analyzer::{AnalysisReport, Analyzer};
+pub use boost::{BoostManager, BoostMode};
+use optimizer::Optimizer;
+use self_heal::SelfHealEngine;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use optimizer::Optimizer;
-pub use boost::{BoostManager, BoostMode};
-use self_heal::SelfHealEngine;
-use analyzer::{Analyzer, AnalysisReport};
 
 /// Superpowers configuration
 #[derive(Debug, Clone)]
