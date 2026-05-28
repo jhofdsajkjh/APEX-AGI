@@ -1,0 +1,27 @@
+{
+  "name": "APEX-AGI Development",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "stable",
+      "components": ["rustfmt", "clippy"]
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "vadimcn.vscode-lldb",
+        "fill-labs.dependi"
+      ],
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.cargo.allFeatures": true
+      }
+    }
+  },
+  "postCreateCommand": "rustc --version && cargo --version && echo '✓ Rust toolchain ready'",
+  "forwardPorts": [3000]
+}

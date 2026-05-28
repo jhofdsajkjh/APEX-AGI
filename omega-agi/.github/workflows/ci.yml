@@ -1,0 +1,76 @@
+name: CI — Full Build & Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ── Full workspace compilation check ──
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo check (all crates)
+        run: cargo check --workspace --all-features
+
+      - name: clippy
+        run: cargo clippy --workspace --all-features -- -D warnings
+
+      - name: rustfmt
+        run: cargo fmt --all --check
+
+  # ── Unit tests ──
+  test:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test (all crates)
+        run: cargo test --workspace --all-features
+
+  # ── Release build ──
+  build-release:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo build --release
+        run: cargo build --release --workspace --all-features
+
+      - name: show binary
+        run: ls -lh target/release/omega-agi
+
+  # ── APEX self-evolution validation ──
+  apex-evolution:
+    runs-on: ubuntu-latest
+    needs: build-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo build (debug, for fast iteration)
+        run: cargo build --workspace --all-features
+
+      - name: quick smoke test — help
+        run: cargo run -- --help
+
+      - name: quick smoke test — version
+        run: cargo run -- --version || echo "no --version flag, skipping"
