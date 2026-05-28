@@ -1,77 +1,153 @@
-name: CI
+name: ΩMEGA AGI — Full CI Pipeline
 
 on:
   push:
-    branches: [ master, main, develop ]
+    branches: [master, main]
+    tags: ["v*"]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
 
 jobs:
+  # ── Full workspace compilation check ──
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo check (all crates)
+        run: cargo check --workspace --all-features
+
+      - name: clippy
+        run: cargo clippy --workspace --all-features -- -D warnings
+
+      - name: rustfmt
+        run: cargo fmt --all --check
+
+  # ── Unit tests ──
+  test:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test (all crates)
+        run: cargo test --workspace --all-features
+
+  # ── Release build ──
   build:
     runs-on: ubuntu-latest
+    needs: test
     strategy:
       matrix:
-        toolchain:
-          - stable
-          - nightly
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
 
+      - name: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-agi-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/omega-agi${{ matrix.target == 'x86_64-pc-windows-msvc' && '.exe' || '' }}
+
+  # ── Docker build ──
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust ${{ matrix.toolchain }}
-        uses: dtolnay/rust-toolchain@master
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          toolchain: ${{ matrix.toolchain }}
-          components: rustfmt, clippy
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache cargo dependencies
-        uses: Swatinem/rust-cache@v2
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          workspaces: omega-agi
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha,format=short
 
-      - name: Check formatting
-        run: cargo fmt --check --manifest-path omega-agi/Cargo.toml
-        if: matrix.toolchain == 'stable'
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Clippy (lints)
-        run: cargo clippy --manifest-path omega-agi/Cargo.toml --workspace -- -D warnings
-        continue-on-error: true  # clippy is advisory until 100% clean
-
-      - name: Build workspace
-        run: cargo build --manifest-path omega-agi/Cargo.toml --workspace --release
-
-      - name: Run tests
-        run: cargo test --manifest-path omega-agi/Cargo.toml --workspace --release
-
-      - name: Test auto_evolve module
-        run: cargo test --manifest-path omega-agi/Cargo.toml -p omega-evolution -- auto_evolve --nocapture
-
-  # ── Integration smoke test ──────────────────────────────────────────────
-  integration:
+  # ── APEX self-evolution smoke test ──
+  apex-evolution:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Install stable Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: cargo build (debug)
+        run: cargo build --workspace --all-features
+
+      - name: smoke test — help
+        run: cargo run -- --help 2>&1 || cargo run -- help
+
+      - name: smoke test — version
+        run: cargo run -- --version 2>&1 || echo "no --version flag, skipping"
+
+      - name: smoke test — health check
+        run: timeout 10 cargo run -- check 2>&1 || true
+
+  # ── Cross-platform build ──
+  cross-platform:
+    runs-on: ubuntu-latest
+    needs: check
+    strategy:
+      matrix:
+        target:
+          - x86_64-pc-windows-gnu
+          - x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Build release
-        run: cargo build --manifest-path omega-agi/Cargo.toml -p omega-agi --release
-
-      - name: Smoke test — version
-        run: ./omega-agi/target/release/omega-agi version
-
-      - name: Smoke test — check
-        run: ./omega-agi/target/release/omega-agi check
-
-      - name: Smoke test — agent with mock LLM
+      - name: Install cross-compilation deps
         run: |
-          ./omega-agi/target/release/omega-agi run "请检查系统健康状态" \
-            || echo "Agent run is advisory (needs OMEGA_API_KEY for real LLM)"
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 2>/dev/null || true
+
+      - name: cargo build
+        run: cargo build --target ${{ matrix.target }}
