@@ -1,4 +1,4 @@
-/// System analyzer — deep inspection and recommendations
+//! System analyzer — deep inspection and recommendations
 //!
 //! Analyzes all system layers and provides actionable
 //! recommendations for improvement.
