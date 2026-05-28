@@ -647,7 +647,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::inference::MockEngine;
+    use crate::engines::MockEngine;
 
     #[tokio::test]
     async fn test_store_and_recall() {
