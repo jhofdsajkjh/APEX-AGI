@@ -416,7 +416,7 @@ mod tests {
     #[tokio::test]
     async fn test_convergence_detection() {
         let collector = Arc::new(FeedbackCollector::new(100));
-        let integrator = FeedbackIntegrator::new(collector);
+        let integrator = FeedbackIntegrator::new(collector.clone());
 
         // Add many identical scores
         for _ in 0..20 {

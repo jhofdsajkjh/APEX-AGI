@@ -284,6 +284,10 @@ fn current_timestamp() -> u64 {
 mod tests {
     use super::*;
 
+    fn generate_id() -> String {
+        format!("proposal_{}", current_timestamp())
+    }
+
     #[tokio::test]
     async fn test_propose_and_vote() {
         let engine = ConsensusEngine::new();
