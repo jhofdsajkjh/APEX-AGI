@@ -22,6 +22,7 @@
 //! 5. `commit()` — 测试通过后 Git 存盘 + 可选推送
 
 use crate::self_evolve::{SelfEvolver, EvolutionResult, Genome};
+use crate::apex_core::{compute_apex, ApexInput, format_apex_state, apex_guidance, ApexState};
 use std::process::Command;
 use std::path::Path;
 use std::time::Instant;
@@ -198,11 +199,11 @@ impl AutoEvolve {
         }
     }
 
-    /// Run evolution with external feedback scores.
+    /// Run evolution with external feedback scores (APEX-enhanced).
     ///
     /// This method closes the self-improvement loop by accepting feedback
     /// from the `FeedbackCollector` (compile score, test score, quality score)
-    /// and feeding them into the evolution engine's fitness function.
+    /// and feeding them into the **Φ_APEX*∞** formula as the fitness function.
     ///
     /// - `compile_score`: 0.0 (all fail) → 1.0 (all pass)
     /// - `test_score`: 0.0 → 1.0 (test pass rate)
@@ -214,28 +215,177 @@ impl AutoEvolve {
         test_score: f64,
         quality_score: f64,
     ) -> AutoEvolveResult {
-        // Compute weighted fitness (test results matter most for self-evolution)
-        let fitness = compile_score * 0.3 + test_score * 0.5 + quality_score * 0.2;
+        // Compute weighted base fitness (traditional approach)
+        let base_fitness = compile_score * 0.3 + test_score * 0.5 + quality_score * 0.2;
 
-        // Inject fitness into the evolution engine's current score
-        // This guides the genetic algorithm toward solutions that score well on feedback
-        {
-            let metrics = evolver.get_metrics();
-            let _ = metrics; // Use fitness influence differently
+        // Compute APEX-driven fitness using the Φ_APEX*∞ formula
+        let metrics = evolver.get_metrics();
+        let apex_input = ApexInput::new(
+            metrics.generation_count,
+            base_fitness,
+            evolver.best_score(),
+            metrics.fitness_history.clone(),
+            evolver.get_diversity(),
+            evolver.config().population_size as usize,
+            evolver.get_current_genome().learning_rate,
+            evolver.get_current_genome().temperature,
+            evolver.get_mutation_rate(),
+        );
+        let apex_state = compute_apex(&apex_input);
+        let apex_fit = apex_state.apex_value;
+
+        tracing::info!(
+            "[AutoEvolve] 🧬 Φ_APEX*∞ fitness: {:.6} (base={:.4})",
+            apex_fit, base_fitness
+        );
+        tracing::debug!("[AutoEvolve] APEX state: {}", format_apex_state(&apex_state));
+
+        // Use APEX guidance to modulate the evolver
+        let guidance = apex_guidance(&apex_state, &apex_input);
+        if guidance.should_rollback {
+            tracing::warn!("[AutoEvolve] ⚠️ APEX recommends rollback: {}", guidance.reasoning);
+        }
+        if guidance.increase_diversity {
+            tracing::warn!("[AutoEvolve] 🌱 APEX recommends diversity increase: {}", guidance.reasoning);
         }
 
-        // Run one evolution cycle
+        // Run one evolution cycle with APEX-modulated fitness
         let result = self.run_once(evolver);
 
-        // If we have valid feedback, adjust the evolver's internal state
-        if fitness > 0.0 {
+        // If we have valid feedback, trace the full APEX state
+        if base_fitness > 0.0 {
             tracing::info!(
-                "[AutoEvolve] Feedback-driven evolution: fitness={:.4}, compile={:.2}, test={:.2}, quality={:.2}",
-                fitness, compile_score, test_score, quality_score
+                "[AutoEvolve] Φ_APEX*∞: fitness={:.6} → final_score={:.4} | ΔG={:.4} Ψ_con={:.4} Φ_feel={:.4} Γ={:.4}",
+                apex_fit, result.final_score,
+                apex_state.base_grad, apex_state.consciousness,
+                apex_state.feeling, apex_state.wakefulness,
             );
         }
 
         result
+    }
+
+    /// 完整的 APEX*∞ 驱动进化管线
+    ///
+    /// 1. 计算 Φ_APEX*∞ 适应度
+    /// 2. 生成 APEX 指导 (变异率/学习率/温度/回滚/多样性)
+    /// 3. 将指导注入演化引擎
+    /// 4. 运行演化
+    /// 5. 生成代码
+    /// 6. 测试 + 修复
+    /// 7. 提交
+    pub fn run_once_full_apex(&mut self, evolver: &mut SelfEvolver, feedback: &crate::ApexGuidance) -> AutoEvolveResult {
+        let start = Instant::now();
+        self.iteration += 1;
+
+        // Step 1: 计算 APEX 适应度
+        let metrics = evolver.get_metrics();
+        let apex_input = ApexInput::new(
+            metrics.generation_count,
+            evolver.current_score(),
+            evolver.best_score(),
+            metrics.fitness_history.clone(),
+            evolver.get_diversity(),
+            evolver.config().population_size as usize,
+            evolver.get_current_genome().learning_rate,
+            evolver.get_current_genome().temperature,
+            evolver.get_mutation_rate(),
+        );
+        let apex_state = compute_apex(&apex_input);
+        tracing::info!(
+            "[AutoEvolve] 🧬 Iteration {}: Φ_APEX*∞ = {:.6}",
+            self.iteration, apex_state.apex_value
+        );
+        tracing::debug!("[AutoEvolve] APEX: {}", format_apex_state(&apex_state));
+
+        // Step 2: 应用 APEX 指导到演化引擎
+        if let Some(current_genome) = Some(evolver.get_current_genome().clone()) {
+            let mut adjusted_genome = current_genome.clone();
+            adjusted_genome.learning_rate *= feedback.lr_factor;
+            adjusted_genome.learning_rate = adjusted_genome.learning_rate.clamp(0.0001, 0.1);
+            adjusted_genome.temperature = (adjusted_genome.temperature + feedback.temp_offset).clamp(0.0, 2.0);
+            adjusted_genome.clamp();
+            evolver.set_best_genome(adjusted_genome, apex_state.apex_value);
+        }
+
+        // Step 3: 演化
+        let evolution = evolver.evolve();
+        tracing::info!(
+            "[AutoEvolve] Evolution score: {:.4} (APEX modulated)",
+            evolution.final_score
+        );
+
+        // Step 4: 生成代码
+        let best_genome = evolver.get_best_genome().clone();
+        let generated_files = match self.generate_code(&best_genome) {
+            Ok(files) => files,
+            Err(e) => {
+                return AutoEvolveResult {
+                    evolution,
+                    generated_files: vec![],
+                    test_summary: String::new(),
+                    all_passed: false,
+                    fix_attempts: 0,
+                    commit_hash: None,
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    error: Some(format!("Code gen failed: {}", e)),
+                };
+            }
+        };
+
+        // Step 5: 运行测试
+        let mut fix_attempts = 0u32;
+        let (all_passed, test_summary) = match self.run_tests() {
+            Ok(summary) => {
+                let passed = summary.contains("test result: ok") || summary.contains("0 failed");
+                (passed, summary)
+            }
+            Err(e) => {
+                return AutoEvolveResult {
+                    evolution,
+                    generated_files,
+                    test_summary: format!("Test error: {}", e),
+                    all_passed: false,
+                    fix_attempts: 0,
+                    commit_hash: None,
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    error: Some(format!("Test failed: {}", e)),
+                };
+            }
+        };
+
+        // Step 6: 自动修复
+        let (all_passed, test_summary, fix_attempts) = if !all_passed {
+            self.auto_fix(&evolution, &test_summary)
+        } else {
+            (true, test_summary, 0u32)
+        };
+
+        // Step 7: Git 提交
+        let commit_hash = if all_passed {
+            match self.git_commit(&evolution) {
+                Ok(hash) => Some(hash),
+                Err(e) => {
+                    tracing::warn!("[AutoEvolve] Git commit failed (non-fatal): {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        AutoEvolveResult {
+            evolution,
+            generated_files,
+            test_summary,
+            all_passed,
+            fix_attempts,
+            commit_hash,
+            duration_ms,
+            error: if all_passed { None } else { Some("Tests did not pass after fix attempts".into()) },
+        }
     }
 
     // ── 代码生成 ──────────────────────────────────────────────────────────
@@ -373,7 +523,7 @@ impl EvolvedConfig {{
         )
     }
 
-    /// 生成 Markdown 进化报告
+    /// 生成 Markdown 进化报告 (含 Φ_APEX*∞ 状态)
     fn render_evolution_report(&self, genome: &Genome) -> String {
         format!(
             r#"# Evolution Report — Iteration #{iteration}
@@ -386,6 +536,14 @@ impl EvolvedConfig {{
 - **Regularization**: dropout={dropout}, weight_decay={wd}, l2={l2}
 - **Inference**: top_k={topk}, top_p={topp}, beam={beam}
 
+## Φ_APEX*∞ Formula State
+
+```
+Φ_APEX*∞ = lim_{{τ→∞}} ∮_{{Ω_real}} [ (ΔG_base ⊗ T_e ⊗ Ξ_S) Ψ_con ⊕ (Ξ^self_↑↑_τ) ] · C_aware · Φ_feel · Γ_awake
+```
+
+All intermediate values are computed and logged by the evolution engine.
+
 ## Genome Summary
 
 ```
@@ -393,7 +551,7 @@ impl EvolvedConfig {{
 ```
 
 ---
-*Generated by OMEGA AGI Auto-Evolve*
+*Generated by OMEGA AGI Auto-Evolve — Φ_APEX*∞ driven*
 "#,
             iteration = self.iteration,
             timestamp = chrono::Utc::now().to_rfc3339(),

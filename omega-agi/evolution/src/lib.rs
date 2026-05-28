@@ -3,6 +3,7 @@
 
 pub mod auto_evolve;
 pub mod self_evolve;
+pub mod apex_core;
 
 pub use self_evolve::{
     SelfEvolver,
@@ -16,6 +17,11 @@ pub use self_evolve::{
 pub use auto_evolve::AutoEvolve;
 pub use auto_evolve::AutoEvolveConfig;
 pub use auto_evolve::AutoEvolveResult;
+
+pub use apex_core::{
+    compute_apex, apex_fitness, apex_guidance, format_apex_state,
+    ApexInput, ApexState, ApexGuidance,
+};
 
 /// Evolution engine version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
