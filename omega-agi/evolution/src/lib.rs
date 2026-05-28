@@ -2,8 +2,19 @@
 //! Layer 3 - Self-evolution engine for continuous performance improvement.
 
 // Nightly toolchain lints — allow pedantic format/naming warnings not applicable on stable
-#![allow(clippy::too_many_arguments, clippy::unnecessary_cast, clippy::iter_cloned_collect, clippy::needless_bool)]
-#![allow(named_arguments_used_positionally, unused_mut, unused_imports, unused_variables, dead_code)]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::unnecessary_cast,
+    clippy::iter_cloned_collect,
+    clippy::needless_bool
+)]
+#![allow(
+    named_arguments_used_positionally,
+    unused_mut,
+    unused_imports,
+    unused_variables,
+    dead_code
+)]
 
 pub mod apex_core;
 pub mod auto_evolve;

@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 /// Security ring levels (lower number = more privileged)
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum SecurityRing {
     /// Ring 0: Kernel-level access (full system control)
     Kernel = 0,
