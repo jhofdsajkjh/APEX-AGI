@@ -16,6 +16,7 @@ pub struct HealAction {
 }
 
 /// The SelfHealEngine — automatically repairs system issues
+#[allow(dead_code)]
 pub struct SelfHealEngine {
     max_attempts: u32,
     heal_count: Arc<RwLock<u32>>,

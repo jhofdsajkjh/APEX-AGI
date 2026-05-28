@@ -25,6 +25,7 @@ pub enum RiskLevel {
 }
 
 /// The Analyzer — deep system analysis
+#[allow(dead_code)]
 pub struct Analyzer {
     depth: u32,
     enabled: bool,

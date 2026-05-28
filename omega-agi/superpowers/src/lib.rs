@@ -71,6 +71,7 @@ pub struct SuperpowerStatus {
 }
 
 /// The main Superpowers engine — enhances and amplifies system capabilities
+#[allow(dead_code)]
 pub struct Superpowers {
     config: SuperpowerConfig,
     optimizer: Arc<RwLock<Optimizer>>,
