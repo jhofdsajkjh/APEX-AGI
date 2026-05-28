@@ -1,38 +1,15 @@
-//! Tool system — the bridge between the LLM Agent and the OMEGA AGI layers.
-//!
-//! The `ToolContext` trait is implemented by the main binary and provides
-//! concrete access to all five layers (HyperCore, Runtime, Engineering,
-//! Evolution, Adapters) plus filesystem operations.
+//! Tool system — updated to use Tool trait internally while keeping
+//! the old ToolContext/ToolResult API for backward compatibility.
 
 use async_trait::async_trait;
 use serde::Serialize;
+use crate::tool::{Tool, ToolRegistry, ToolResult as NewToolResult};
+use std::sync::Arc;
 
-// ---------------------------------------------------------------------------
-// Result type
-// ---------------------------------------------------------------------------
+// Re-export for backward compatibility
+pub use crate::tool::ToolResult;
 
-/// The outcome of a single tool invocation.
-#[derive(Debug, Clone)]
-pub struct ToolResult {
-    pub success: bool,
-    pub output: String,
-    pub tool_name: String,
-}
-
-impl ToolResult {
-    pub fn ok(tool_name: impl Into<String>, output: impl Into<String>) -> Self {
-        Self { success: true, tool_name: tool_name.into(), output: output.into() }
-    }
-    pub fn err(tool_name: impl Into<String>, msg: impl Into<String>) -> Self {
-        Self { success: false, tool_name: tool_name.into(), output: msg.into() }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tool descriptor (used in the system prompt)
-// ---------------------------------------------------------------------------
-
-/// Describes a tool to the LLM — name, description, and JSON-schema-like args.
+/// Tool descriptor (kept for backward compatibility).
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolDescriptor {
     pub name: &'static str,
@@ -40,78 +17,72 @@ pub struct ToolDescriptor {
     pub args_json_schema: &'static str,
 }
 
-/// All tools the agent can call. Each entry becomes a bullet in the system prompt.
+/// All tools available to the Agent (kept for backward compatibility).
 pub static ALL_TOOLS: &[ToolDescriptor] = &[
     ToolDescriptor {
         name: "health",
-        description: "Check the overall health of the OMEGA AGI system. Returns status of all subsystems (hypercore, runtime, engineering, evolution, adapters).",
+        description: "Check the overall health of the OMEGA AGI system.",
         args_json_schema: r#"{}"#,
     },
     ToolDescriptor {
         name: "diagnose",
-        description: "Run a full diagnostic of the system. Returns detailed health report with subsystem-level information.",
+        description: "Run a full diagnostic of the system.",
         args_json_schema: r#"{}"#,
     },
     ToolDescriptor {
         name: "heal",
-        description: "Attempt to automatically heal a subsystem that is in an unhealthy state.",
-        args_json_schema: r#"{"type":"object","properties":{"target":{"type":"string","description":"Subsystem name to heal"},"issue":{"type":"string","description":"Description of the issue"}},"required":["target","issue"]}"#,
+        description: "Attempt to automatically heal a subsystem.",
+        args_json_schema: r#"{"type":"object","properties":{"target":{"type":"string"},"issue":{"type":"string"}},"required":["target","issue"]}"#,
     },
     ToolDescriptor {
         name: "codegen",
-        description: "Generate code in a specified language based on a natural-language description.",
-        args_json_schema: r#"{"type":"object","properties":{"description":{"type":"string","description":"What the code should do"},"language":{"type":"string","enum":["rust","python"],"description":"Target programming language"}},"required":["description","language"]}"#,
+        description: "Generate code in a specified language.",
+        args_json_schema: r#"{"type":"object","properties":{"description":{"type":"string"},"language":{"type":"string","enum":["rust","python"]}},"required":["description","language"]}"#,
     },
     ToolDescriptor {
         name: "evolve",
-        description: "Run one cycle of the evolution engine. Mutates the current genome and evaluates the new configuration.",
+        description: "Run one cycle of the evolution engine.",
         args_json_schema: r#"{}"#,
     },
     ToolDescriptor {
         name: "evolve_full",
-        description: "Run the complete auto-evolve cycle (evolve → generate → test → fix → commit). Automatically improves the system parameters and code.",
+        description: "Run the complete auto-evolve pipeline.",
         args_json_schema: r#"{}"#,
     },
     ToolDescriptor {
         name: "read",
-        description: "Read the contents of a file from disk.",
-        args_json_schema: r#"{"type":"object","properties":{"path":{"type":"string","description":"Absolute path to the file"}},"required":["path"]}"#,
+        description: "Read a file from the filesystem.",
+        args_json_schema: r#"{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}"#,
     },
     ToolDescriptor {
         name: "write",
-        description: "Write content to a file on disk. Creates directories as needed.",
-        args_json_schema: r#"{"type":"object","properties":{"path":{"type":"string","description":"Absolute path to the file"},"content":{"type":"string","description":"Content to write"}},"required":["path","content"]}"#,
+        description: "Write content to a file.",
+        args_json_schema: r#"{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}"#,
     },
     ToolDescriptor {
         name: "search",
-        description: "Search for a pattern in the project source code (grep).",
-        args_json_schema: r#"{"type":"object","properties":{"pattern":{"type":"string","description":"Text or regex pattern to search for"}},"required":["pattern"]}"#,
+        description: "Search source code for a pattern.",
+        args_json_schema: r#"{"type":"object","properties":{"pattern":{"type":"string"}},"required":["pattern"]}"#,
     },
     ToolDescriptor {
         name: "ls",
-        description: "List files and directories at a given path.",
-        args_json_schema: r#"{"type":"object","properties":{"path":{"type":"string","description":"Directory path to list"}},"required":["path"]}"#,
+        description: "List directory contents.",
+        args_json_schema: r#"{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}"#,
     },
     ToolDescriptor {
         name: "bash",
-        description: "Execute a shell command and return its output.",
-        args_json_schema: r#"{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"}},"required":["command"]}"#,
+        description: "Execute a shell command.",
+        args_json_schema: r#"{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}"#,
     },
 ];
 
-// ---------------------------------------------------------------------------
-// Tool context trait
-// ---------------------------------------------------------------------------
-
-/// Abstract interface that the host application implements to give the agent
-/// access to the five OMEGA AGI layers plus the filesystem.
+/// Abstract interface for the host application (kept for backward compatibility).
 #[async_trait]
 pub trait ToolContext: Send + Sync {
-    /// Execute a named tool with the given JSON arguments.
     async fn execute_tool(&self, name: &str, args: &serde_json::Value) -> ToolResult;
 }
 
-/// Render the tool descriptions into a system-prompt-friendly string.
+/// Render tool descriptions for system prompt (kept for backward compatibility).
 pub fn tool_descriptions_prompt() -> String {
     let mut out = String::from("You have access to the following tools:\n\n");
     for t in ALL_TOOLS {

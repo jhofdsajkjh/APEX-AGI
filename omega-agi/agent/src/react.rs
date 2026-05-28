@@ -1,10 +1,10 @@
-//! ReAct (Reasoning + Acting) loop engine.
+//! ReAct (Reasoning + Acting) loop engine — updated to use InferenceEngine trait.
 //!
 //! Cycles: Thought → Action → Observation → Thought → … → Answer.
 //! The LLM decides when it has enough information to produce the final answer.
 
-use crate::llm::{LLMClient, Message};
-use crate::tools::{tool_descriptions_prompt, ToolContext, ToolResult};
+use crate::inference::{InferenceEngine, Message};
+use crate::tool::{ToolContext, ToolResult};
 use tracing::{debug, info, warn};
 
 // ---------------------------------------------------------------------------
@@ -100,49 +100,51 @@ impl ReActEngine {
         Self { max_steps }
     }
 
-    /// Run the ReAct loop: LLM ↔ tools ↔ LLM … until Answer or max steps.
+    /// Run the ReAct loop using a generic InferenceEngine.
     pub async fn run(
         &self,
-        llm: &LLMClient,
-        task: &str,
+        llm: &dyn InferenceEngine,
         context: &dyn ToolContext,
+        task: &str,
     ) -> anyhow::Result<String> {
         let system_prompt = build_system_prompt();
-
         let mut messages = vec![
-            Message::system(&system_prompt),
+            Message::system(system_prompt),
             Message::user(task.to_string()),
         ];
 
-        for step in 1..=self.max_steps {
-            info!(step, "ReAct loop iteration");
+        for step in 0..self.max_steps {
+            debug!(step, "ReAct iteration");
 
-            // 1. LLM thinks
             let reply = llm.chat(&messages).await?;
-            debug!(step, reply = %reply, "LLM reply");
-            messages.push(Message::assistant(&reply));
+            let content = reply.content.clone();
 
-            // 2. Parse the reply
-            match parse_step(&reply) {
+            debug!(step, response_len = content.len(), "LLM response");
+            messages.push(Message::assistant(&content));
+
+            match parse_step(&content) {
                 LlmStep::Answer(answer) => {
                     info!(step, "Got final answer");
                     return Ok(answer);
                 }
 
                 LlmStep::Action { name, args } => {
-                    info!(step, action = %name, args = %args, "Executing tool");
+                    debug!(step, action = %name, "Executing tool");
 
-                    // Special case: `think` is just a no-op reasoning step
-                    if name == "think" {
-                        let thought = args
-                            .get("thought")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Continuing reasoning…");
-                        messages.push(Message::user(format!(
-                            "Observation (internal thought): {}",
-                            thought
-                        )));
-                        continue;
+                    match name.as_str() {
+                        "think" | "reason" => {
+                            // Internal thought — just log and continue
+                            let thought = args.get("thought")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("...");
+                            debug!("Internal thought: {}", thought);
+                            messages.push(Message::user(format!(
+                                "Observation (internal thought): {}",
+                                thought
+                            )));
+                            continue;
+                        }
+                        _ => {}
                     }
 
                     // Execute the tool
@@ -175,12 +177,15 @@ impl ReActEngine {
         ));
         let final_reply = llm.chat(&messages).await?;
         // Try to extract Answer one more time
-        match parse_step(&final_reply) {
+        match parse_step(&final_reply.content) {
             LlmStep::Answer(a) => Ok(a),
             _ => Ok(format!(
                 "Reached max steps ({}) without a final answer. Last LLM output:\n{}",
-                self.max_steps, final_reply
+                self.max_steps, final_reply.content
             )),
         }
     }
 }
+
+// Re-export from tools module for backward compatibility
+pub use crate::tools::{tool_descriptions_prompt, ToolContext, ToolResult};

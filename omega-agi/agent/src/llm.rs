@@ -1,26 +1,19 @@
-//! LLM API client — OpenAI-compatible chat completions.
-//! Supports any provider that exposes `/v1/chat/completions` (OpenAI, Claude via proxy,
-//! local Ollama, vLLM, etc.).
+//! LLM API client — kept for backward compatibility.
+//!
+//! New code should use `crate::engines::OpenAIEngine` instead.
 
 use serde::{Deserialize, Serialize};
 
-/// Simple inline macro to trim leading whitespace from multi-line strings.
 macro_rules! dedent {
     ($s:expr) => {{
         let s = $s;
         let lines: Vec<&str> = s.lines().collect();
         let trimmed: Vec<&str> = lines.iter().map(|l| l.trim_start()).collect();
-        // Drop first line if empty
         let start = trimmed.first().map(|l| l.is_empty()).unwrap_or(false) as usize;
         trimmed[start..].join("\n")
     }};
 }
 
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
-/// LLM provider configuration. All fields have sensible defaults for OpenAI.
 #[derive(Debug, Clone)]
 pub struct LLMConfig {
     pub api_url: String,
@@ -42,11 +35,6 @@ impl Default for LLMConfig {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Message types
-// ---------------------------------------------------------------------------
-
-/// A single chat message (role + content).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub role: String,
@@ -64,10 +52,6 @@ impl Message {
         Self { role: "assistant".into(), content: content.into() }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Request / response wire types
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
 struct ChatRequest {
@@ -96,18 +80,15 @@ struct Usage {
     total_tokens: u32,
 }
 
-// ---------------------------------------------------------------------------
-// Client
-// ---------------------------------------------------------------------------
-
-/// HTTP client for LLM chat completions.
+/// HTTP client for LLM chat completions — legacy interface.
+///
+/// For new code, use `crate::engines::OpenAIEngine` (implements InferenceEngine).
 pub struct LLMClient {
     config: LLMConfig,
     client: reqwest::Client,
 }
 
 impl LLMClient {
-    /// Create a new client with the given configuration.
     pub fn new(config: LLMConfig) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(180))
@@ -116,7 +97,6 @@ impl LLMClient {
         Self { config, client }
     }
 
-    /// Build config from environment variables (with the same names as `.env.example`).
     pub fn from_env() -> Self {
         let api_url = std::env::var("OMEGA_API_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".into());
@@ -124,26 +104,21 @@ impl LLMClient {
         let model = std::env::var("OMEGA_MODEL_NAME")
             .unwrap_or_else(|_| "gpt-4o".into());
         let max_tokens = std::env::var("OMEGA_MAX_TOKENS")
-            .ok()
-            .and_then(|v| v.parse().ok())
+            .ok().and_then(|v| v.parse().ok())
             .unwrap_or(4096);
         let temperature = std::env::var("OMEGA_TEMPERATURE")
-            .ok()
-            .and_then(|v| v.parse().ok())
+            .ok().and_then(|v| v.parse().ok())
             .unwrap_or(0.7);
 
         Self::new(LLMConfig { api_url, api_key, model, max_tokens, temperature })
     }
 
-    /// Send a chat completion request and return the assistant's reply text.
     pub async fn chat(&self, messages: &[Message]) -> anyhow::Result<String> {
-        // If no API key is configured, return a mock so the system is still usable
-        // for development / demonstration.
         if self.config.api_key.is_empty() {
             return Ok(self.mock_response(messages));
         }
 
-        let request = ChatRequest {
+        let body = ChatRequest {
             model: self.config.model.clone(),
             messages: messages.to_vec(),
             max_tokens: self.config.max_tokens,
@@ -151,17 +126,15 @@ impl LLMClient {
         };
 
         let url = format!("{}/chat/completions", self.config.api_url.trim_end_matches('/'));
-
-        let response = self
-            .client
+        let response = self.client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
-            .json(&request)
+            .json(&body)
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
+        let status = response.status();
+        if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             anyhow::bail!("LLM API error ({}): {}", status, body);
         }
@@ -174,9 +147,7 @@ impl LLMClient {
             .ok_or_else(|| anyhow::anyhow!("LLM returned empty choices"))
     }
 
-    // ── mock fallback (used when no API key is set) ──────────────────────
     fn mock_response(&self, messages: &[Message]) -> String {
-        // Extract the last user message for context
         let user_msg = messages
             .iter()
             .rev()
@@ -184,7 +155,6 @@ impl LLMClient {
             .map(|m| m.content.as_str())
             .unwrap_or("");
 
-        // Determine the task from the user message
         if user_msg.contains("健康") || user_msg.contains("health") || user_msg.contains("检查") {
             return dedent!(r#"
                 Thought: The user wants a health check. I'll use the health tool.
@@ -208,14 +178,10 @@ impl LLMClient {
             "#).to_string();
         }
 
-        // Generic fallback
         dedent!(r#"
             Thought: I'll first check the system health to understand the current state.
             Action: health
             Action Input: {}
-        "#)
-        .to_string()
+        "#).to_string()
     }
 }
-
-

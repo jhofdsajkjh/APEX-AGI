@@ -2,11 +2,11 @@
 name = "omega-agent"
 version = "0.1.0"
 edition = "2021"
-description = "Layer 5 - LLM-powered Agent with ReAct reasoning, tool integration, and autonomous task execution"
+description = "Layer 5 - LLM-powered Agent with ReAct reasoning, tool integration, multi-agent orchestration, memory, knowledge, and self-improvement"
 
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
@@ -14,3 +14,8 @@ anyhow = "1.0"
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
+rusqlite = { version = "0.31", features = ["bundled"], optional = true }
+
+[features]
+default = ["sqlite"]
+sqlite = ["rusqlite"]
