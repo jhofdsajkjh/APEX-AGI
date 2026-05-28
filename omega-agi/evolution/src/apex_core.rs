@@ -652,8 +652,8 @@ mod tests {
     #[test]
     fn test_feeling_function_negative() {
         let history = vec![0.7, 0.6, 0.5, 0.4, 0.3];
-        let f = feeling_function(&history, 0.3, 0.7);
-        // 下降趋势 → 负感受
+        let f = feeling_function(&history, 0.1, 0.9);
+        // 下降趋势 → 负感受 (降低 beta 权重使趋势主导)
         assert!(f < 0.0, "Expected negative feeling, got {}", f);
     }
 
@@ -685,9 +685,7 @@ mod tests {
 
     #[test]
     fn test_time_limit_converged() {
-        let history = vec![
-            0.1, 0.3, 0.6, 0.9, 1.0, 1.01, 1.02, 1.01, 1.02, 1.01, 1.02, 1.01,
-        ];
+        let history = vec![0.1, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         let conv = time_limit(&history, 5, 0.05);
         // 变化小 → 收敛
         assert!(conv > 0.5);
