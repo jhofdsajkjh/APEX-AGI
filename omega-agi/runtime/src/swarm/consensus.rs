@@ -1,8 +1,8 @@
 //! Raft共识引擎 - Agent间冲突解决
 
-use super::{generate_id, SwarmError};
+use super::SwarmError;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -78,6 +78,7 @@ struct ProposalState {
     created_at: u64,
 }
 
+#[allow(clippy::new_without_default)]
 impl ConsensusEngine {
     pub fn new() -> Self {
         Self {

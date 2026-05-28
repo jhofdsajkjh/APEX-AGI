@@ -1,10 +1,7 @@
-//! System analyzer — deep inspection and recommendations
+/// System analyzer — deep inspection and recommendations
 //!
 //! Analyzes all system layers and provides actionable
 //! recommendations for improvement.
-
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Analysis report for the entire system
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

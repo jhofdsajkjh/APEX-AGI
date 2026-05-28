@@ -4,7 +4,7 @@
 
 use super::SwarmError;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+// HashMap unused in this file
 
 /// CRDT文档
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -84,6 +84,7 @@ struct CharElement {
     deleted: bool,
 }
 
+#[allow(clippy::new_without_default)]
 impl CollaborativeText {
     pub fn new() -> Self {
         Self {
@@ -203,7 +204,7 @@ impl CollaborativeText {
         // 合并字符
         for other_char in &other.chars {
             if !self.chars.iter().any(|c| c.id == other_char.id) {
-                let mut element = other_char.clone();
+                let element = other_char.clone();
                 let pos = self.find_insert_position(&element);
                 self.chars.insert(pos, element);
             }
@@ -312,14 +313,15 @@ impl CollaborativeText {
     }
 }
 
-impl ToString for CollaborativeText {
-    fn to_string(&self) -> String {
-        self.visible_text()
+impl std::fmt::Display for CollaborativeText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.visible_text())
     }
 }
 
 /// 文本变更操作
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[allow(private_interfaces)]
 pub enum TextChange {
     Insert {
         pos: usize,
@@ -361,6 +363,7 @@ impl TextChange {
     }
 
     /// 变换变更以适应并发编辑 (OT算法)
+    #[allow(unused_variables)]
     pub fn transform(&self, other: &TextChange) -> TextChange {
         // 简化实现，实际OT更复杂
         self.clone()

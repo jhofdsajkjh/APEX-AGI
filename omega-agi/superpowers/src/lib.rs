@@ -110,7 +110,7 @@ impl Superpowers {
 
     /// Run auto-optimization cycle
     pub async fn optimize(&self) -> String {
-        let mut opt = self.optimizer.write().await;
+        let opt = self.optimizer.write().await;
         let result = opt.run().await;
         tracing::info!("Auto-optimization complete: {}", result);
         result

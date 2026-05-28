@@ -142,7 +142,7 @@ impl HealthMonitor {
                 m.task_success_rate = m.task_success_rate * 0.9 + 0.1;
             } else {
                 m.consecutive_failures += 1;
-                m.task_success_rate = m.task_success_rate * 0.9;
+                m.task_success_rate *= 0.9;
             }
             Ok(())
         } else {

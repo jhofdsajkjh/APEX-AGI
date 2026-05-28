@@ -253,7 +253,7 @@ impl ActorSystem {
 
     /// Stop an actor by closing its mailbox.
     pub fn stop(&self, id: ActorId) -> bool {
-        if let Some((_, actor)) = self.actors.remove(&id) {
+        if let Some((_, _actor)) = self.actors.remove(&id) {
             info!(actor_id = %id, "Actor stopped");
             true
         } else {
